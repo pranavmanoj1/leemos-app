@@ -1,0 +1,924 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Notes From The Underground</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Literata:ital,opsz,wght@0,7..72,300;0,7..72,400;1,7..72,300;1,7..72,400&display=swap" rel="stylesheet" />
+
+  <!-- Start fetching the Pretext module in parallel with HTML/CSS so the
+       module script below doesn't introduce a serial network hop. -->
+  <link rel="modulepreload" href="https://esm.sh/@chenglou/pretext@0.0.7" />
+
+  <!-- Restore theme before first paint — no flash -->
+  <script>
+    (function () {
+      var t = localStorage.getItem('nr-theme') || 'light';
+      document.documentElement.className = t;
+    })();
+  </script>
+
+  <style>
+    /* ── THEMES ── */
+    html.light, html:not(.sepia):not(.dark) { --bg: #faf8f3; --ink: #1a1a1a; }
+    html.sepia { --bg: #f4ecd8; --ink: #3b2f1e; }
+    html.dark  { --bg: #1c1c1e; --ink: #e8e3d9; }
+
+    /* ── RESET ── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    button { cursor: pointer; font-family: inherit; }
+
+    /* ── BASE ── */
+    html, body {
+      height: 100%;
+      background: var(--bg);
+      color: var(--ink);
+      font-family: 'Literata', Georgia, Cambria, 'Times New Roman', serif;
+      -webkit-font-smoothing: antialiased;
+      transition: background 0.5s, color 0.5s;
+    }
+
+    /* ── PROGRESS BAR ── */
+    #progress-bar {
+      position: fixed;
+      top: 0; left: 0;
+      height: 2px;
+      background: var(--ink);
+      opacity: 0.25;
+      width: 0%;
+      transition: width 0.35s ease;
+      z-index: 100;
+      pointer-events: none;
+    }
+
+    /* ── SPLASH ── */
+    #splash {
+      position: fixed; inset: 0;
+      background: var(--bg);
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      z-index: 200;
+      transition: opacity 1s ease;
+    }
+    #splash.hide { opacity: 0; pointer-events: none; }
+    #splash h1 { font-size: 28px; font-weight: 400; margin-bottom: 8px; letter-spacing: 0.01em; }
+    #splash p  { font-size: 15px; opacity: 0.45; letter-spacing: 0.06em; }
+
+    /* ── READER LAYOUT ── */
+    #reader {
+      min-height: 100vh;
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+      padding: 80px 24px;
+    }
+
+    #reading-column {
+      width: 100%;
+      max-width: 68ch;
+    }
+
+    /* ── PAGE CONTENT ── */
+    #page-content {
+      font-size: 20px;
+      line-height: 1.6;
+      transition: opacity 0.2s ease;
+    }
+    #page-content.fading { opacity: 0; }
+
+    #page-content p {
+      text-indent: 1.5em;
+      margin: 0;
+    }
+    #page-content p:first-of-type { text-indent: 0; }
+
+    /* ── CONTROLS OVERLAY ──
+       The container is always pointer-events: none so the text beneath stays
+       selectable.  Only the interactive children become clickable, and only
+       while the overlay is visible. */
+    #controls {
+      position: fixed; inset: 0;
+      z-index: 50;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.3s ease;
+    }
+    #controls.visible { opacity: 1; }
+    #controls.visible .nav-arrow,
+    #controls.visible #toolbar-strip,
+    #controls.visible #page-indicator { pointer-events: auto; }
+
+    /* nav arrows */
+    .nav-arrow {
+      position: absolute;
+      top: 50%; transform: translateY(-50%);
+      width: 44px; height: 44px;
+      background: var(--bg);
+      color: var(--ink);
+      border: 1px solid color-mix(in srgb, var(--ink) 16%, transparent);
+      border-radius: 50%;
+      font-size: 18px;
+      display: flex; align-items: center; justify-content: center;
+      transition: background 0.15s;
+    }
+    .nav-arrow:hover { background: color-mix(in srgb, var(--ink) 8%, var(--bg)); }
+    .nav-arrow:disabled { opacity: 0.25; pointer-events: none; }
+    #btn-prev { left: 20px; }
+    #btn-next { right: 20px; }
+
+    /* ── BOTTOM TOOLBAR ── */
+    #bottom-bar {
+      position: absolute; bottom: 0; left: 0; right: 0;
+      display: flex; flex-direction: column;
+      align-items: center;
+      padding: 0 20px 20px;
+      gap: 10px;
+    }
+
+    #page-indicator {
+      font-size: 11px;
+      letter-spacing: 0.07em;
+      opacity: 0.35;
+    }
+
+    #toolbar-strip {
+      display: flex;
+      align-items: center;
+      background: var(--bg);
+      border: 1px solid color-mix(in srgb, var(--ink) 14%, transparent);
+      border-radius: 16px;
+      padding: 6px 8px;
+      gap: 2px;
+      box-shadow: 0 4px 24px color-mix(in srgb, var(--ink) 10%, transparent);
+    }
+
+    .tool-btn {
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      gap: 3px;
+      background: none;
+      color: var(--ink);
+      border: none;
+      border-radius: 10px;
+      padding: 8px 11px;
+      min-width: 52px;
+      transition: background 0.15s, color 0.15s, opacity 0.15s;
+      opacity: 0.65;
+    }
+    .tool-btn svg { display: block; flex-shrink: 0; }
+    .tool-btn span {
+      font-size: 9px;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      white-space: nowrap;
+      font-family: system-ui, -apple-system, sans-serif;
+    }
+    .tool-btn:hover  { background: color-mix(in srgb, var(--ink) 7%, var(--bg)); opacity: 1; }
+    .tool-btn.active { background: var(--ink); color: var(--bg); opacity: 1; }
+    .tool-btn:disabled { opacity: 0.2; pointer-events: none; }
+
+    .tool-sep {
+      width: 1px;
+      height: 28px;
+      background: color-mix(in srgb, var(--ink) 12%, transparent);
+      margin: 0 4px;
+      flex-shrink: 0;
+    }
+
+    /* ── TOC ── */
+    #toc-backdrop {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.28);
+      z-index: 60;
+      opacity: 0; pointer-events: none;
+      transition: opacity 0.3s;
+    }
+    #toc-backdrop.open { opacity: 1; pointer-events: auto; }
+
+    #toc-panel {
+      position: fixed; top: 0; left: 0; bottom: 0;
+      width: 280px;
+      background: var(--bg);
+      border-right: 1px solid color-mix(in srgb, var(--ink) 10%, transparent);
+      z-index: 70;
+      display: flex; flex-direction: column;
+      transform: translateX(-100%);
+      transition: transform 0.32s cubic-bezier(0.4,0,0.2,1);
+    }
+    #toc-panel.open { transform: translateX(0); }
+
+    #toc-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 20px 16px;
+      border-bottom: 1px solid color-mix(in srgb, var(--ink) 10%, transparent);
+      flex-shrink: 0;
+    }
+    #toc-title {
+      font-size: 11px; font-weight: 500;
+      letter-spacing: 0.1em; text-transform: uppercase;
+      opacity: 0.45;
+    }
+    #toc-close {
+      background: none; border: none; color: var(--ink);
+      font-size: 22px; line-height: 1; opacity: 0.45;
+      padding: 2px 6px;
+      transition: opacity 0.15s;
+    }
+    #toc-close:hover { opacity: 1; }
+
+    #toc-list { list-style: none; flex: 1; overflow-y: auto; padding: 8px; }
+    #toc-list li button {
+      width: 100%; text-align: left;
+      padding: 12px 16px; border: none;
+      background: none; color: var(--ink);
+      font-size: 15px; border-radius: 8px;
+      transition: background 0.15s;
+    }
+    #toc-list li button:hover   { background: color-mix(in srgb, var(--ink) 8%, var(--bg)); }
+    #toc-list li button.current { background: var(--ink); color: var(--bg); }
+
+    /* ── TAP ZONES (mobile only) ── */
+    .tap-zone {
+      position: fixed; top: 0; bottom: 0; width: 25%;
+      z-index: 10;
+    }
+    #tap-prev { left: 0; }
+    #tap-next { right: 0; }
+    @media (min-width: 768px) { .tap-zone { display: none; } }
+
+    @media (max-width: 600px) {
+      #reader { padding: 48px 20px; }
+      #top-bar { flex-wrap: wrap; gap: 8px; }
+    }
+  </style>
+</head>
+<body>
+
+  <div id="progress-bar"></div>
+
+  <div id="splash">
+    <h1 id="splash-title"></h1>
+    <p id="splash-author"></p>
+  </div>
+
+  <div id="reader">
+    <div id="reading-column">
+      <div id="page-content"></div>
+    </div>
+  </div>
+
+  <div class="tap-zone" id="tap-prev"></div>
+  <div class="tap-zone" id="tap-next"></div>
+
+  <div id="controls">
+    <button class="nav-arrow" id="btn-prev">&#8592;</button>
+    <button class="nav-arrow" id="btn-next">&#8594;</button>
+
+    <div id="bottom-bar">
+      <span id="page-indicator"></span>
+
+      <div id="toolbar-strip">
+
+        <!-- Table of Contents -->
+        <button class="tool-btn" id="btn-toc">
+          <svg width="18" height="14" viewBox="0 0 18 14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round">
+            <line x1="1" y1="2" x2="17" y2="2"/>
+            <line x1="1" y1="7" x2="13" y2="7"/>
+            <line x1="1" y1="12" x2="10" y2="12"/>
+          </svg>
+          <span>Contents</span>
+        </button>
+
+        <div class="tool-sep"></div>
+
+        <!-- Font size decrease -->
+        <button class="tool-btn" id="btn-font-minus">
+          <svg width="18" height="18" viewBox="0 0 18 18" fill="currentColor">
+            <text x="1" y="14" font-size="13" font-family="Georgia, serif" fill="currentColor">A</text>
+            <line x1="12" y1="10" x2="17" y2="10" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+          </svg>
+          <span>Smaller</span>
+        </button>
+
+        <!-- Font size increase -->
+        <button class="tool-btn" id="btn-font-plus">
+          <svg width="18" height="18" viewBox="0 0 18 18" fill="currentColor">
+            <text x="0" y="15" font-size="16" font-family="Georgia, serif" fill="currentColor">A</text>
+            <line x1="13" y1="8" x2="17" y2="8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+            <line x1="15" y1="6" x2="15" y2="10" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+          </svg>
+          <span>Larger</span>
+        </button>
+
+        <!-- Font family toggle -->
+        <button class="tool-btn" id="btn-font-toggle">
+          <svg width="18" height="18" viewBox="0 0 18 18" fill="currentColor">
+            <text x="0" y="14" font-size="14" font-family="Georgia, serif" fill="currentColor">T</text>
+            <text x="10" y="14" font-size="11" font-family="system-ui, sans-serif" fill="currentColor">T</text>
+          </svg>
+          <span id="font-toggle-label">Serif</span>
+        </button>
+
+        <div class="tool-sep"></div>
+
+        <!-- Light theme — sun -->
+        <button class="tool-btn" data-theme="light">
+          <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
+            <circle cx="9" cy="9" r="3.2" fill="currentColor" stroke="none"/>
+            <line x1="9" y1="1"   x2="9"   y2="3"/>
+            <line x1="9" y1="15"  x2="9"   y2="17"/>
+            <line x1="1" y1="9"   x2="3"   y2="9"/>
+            <line x1="15" y1="9"  x2="17"  y2="9"/>
+            <line x1="3.2" y1="3.2"  x2="4.6" y2="4.6"/>
+            <line x1="13.4" y1="13.4" x2="14.8" y2="14.8"/>
+            <line x1="14.8" y1="3.2"  x2="13.4" y2="4.6"/>
+            <line x1="4.6"  y1="13.4" x2="3.2"  y2="14.8"/>
+          </svg>
+          <span>Light</span>
+        </button>
+
+        <!-- Sepia theme — half-filled circle (warm) -->
+        <button class="tool-btn" data-theme="sepia">
+          <svg width="18" height="18" viewBox="0 0 18 18">
+            <circle cx="9" cy="9" r="6.5" fill="none" stroke="currentColor" stroke-width="1.5"/>
+            <path d="M9 2.5 A6.5 6.5 0 0 1 9 15.5 Z" fill="currentColor"/>
+          </svg>
+          <span>Sepia</span>
+        </button>
+
+        <!-- Dark theme — crescent moon -->
+        <button class="tool-btn" data-theme="dark">
+          <svg width="18" height="18" viewBox="0 0 18 18" fill="currentColor">
+            <path d="M14.5 11.5 A7 7 0 1 1 6.5 3.5 A5 5 0 0 0 14.5 11.5 Z"/>
+          </svg>
+          <span>Dark</span>
+        </button>
+
+      </div>
+    </div>
+  </div>
+
+  <div id="toc-backdrop"></div>
+  <div id="toc-panel">
+    <div id="toc-header">
+      <span id="toc-title">Contents</span>
+      <button id="toc-close">&#215;</button>
+    </div>
+    <ul id="toc-list"></ul>
+  </div>
+
+  <script type="module">
+    // ─────────────────────────────────────────────────────────────────────────────
+    // PRETEXT — pure-JS multiline text measurement.  Loaded as an ES module from
+    // a CDN so we keep this view zero-build.
+    // ─────────────────────────────────────────────────────────────────────────────
+    import { prepare, layout, clearCache } from 'https://esm.sh/@chenglou/pretext@0.0.7';
+
+    // ─────────────────────────────────────────────────────────────────────────────
+    // BOOK DATA  (populated from the API — see loadBook() below)
+    // ─────────────────────────────────────────────────────────────────────────────
+    var BOOK_ID = 1;
+    var API_BASE = (location.protocol === 'file:') ? 'http://localhost:3000' : '';
+
+    var BOOK = {
+      title: '',
+      author: '',
+      chapters: []
+    };
+
+    // Convert a DB chapter row { id, position, prose } into the shape the UI
+    // expects { title, paragraphs }. Each prose blob begins with "Chapter N\n\n\n",
+    // so we split the first line off as the title and use the rest as content.
+    //
+    // Paragraphs in the source are separated by blank lines. Within a paragraph
+    // the source is often hard-wrapped (one printed line per source line); we
+    // collapse those single newlines into spaces so the renderer can re-wrap.
+    function normaliseChapter(row) {
+      var prose = (row.prose || '').replace(/\r\n?/g, '\n');
+      var nl = prose.indexOf('\n');
+      var title, content;
+      if (nl === -1) {
+        title   = 'Chapter ' + row.position;
+        content = prose;
+      } else {
+        title   = prose.slice(0, nl).trim() || ('Chapter ' + row.position);
+        content = prose.slice(nl + 1).replace(/^\n+/, '');
+      }
+      var paragraphs = content
+        .split(/\n{2,}/)
+        .map(function (p) { return p.replace(/\s*\n\s*/g, ' ').trim(); })
+        .filter(function (p) { return p.length > 0; });
+      return { title: title, paragraphs: paragraphs };
+    }
+
+    function loadBook() {
+      return fetch(API_BASE + '/api/books/' + BOOK_ID)
+        .then(function (res) {
+          if (!res.ok) throw new Error('HTTP ' + res.status);
+          return res.json();
+        })
+        .then(function (data) {
+          BOOK.title    = data.title  || '';
+          BOOK.author   = data.author || '';
+          BOOK.chapters = (data.chapters || [])
+            .slice()
+            .sort(function (a, b) { return a.position - b.position; })
+            .map(normaliseChapter);
+          if (BOOK.title)  document.title = BOOK.title;
+          if ($splashTitle  && BOOK.title)  $splashTitle.textContent  = BOOK.title;
+          if ($splashAuthor && BOOK.author) $splashAuthor.textContent = BOOK.author;
+        });
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────────
+    // STATE
+    // ─────────────────────────────────────────────────────────────────────────────
+    var state = {
+      chapterIndex: parseInt(localStorage.getItem('nr-chapter') || '0', 10),
+      pageIndex:    parseInt(localStorage.getItem('nr-page')    || '0', 10),
+      fontSize:     parseInt(localStorage.getItem('nr-size')    || '20', 10),
+      fontFamily:   localStorage.getItem('nr-font')  || 'serif',
+      theme:        localStorage.getItem('nr-theme') || 'light',
+      pages: []
+    };
+
+    var FONT_MIN = 16, FONT_MAX = 24;
+    state.fontSize = Math.max(FONT_MIN, Math.min(FONT_MAX, state.fontSize));
+
+    // ─────────────────────────────────────────────────────────────────────────────
+    // DOM REFS
+    // ─────────────────────────────────────────────────────────────────────────────
+    var $content    = document.getElementById('page-content');
+    var $controls   = document.getElementById('controls');
+    var $progress   = document.getElementById('progress-bar');
+    var $indicator  = document.getElementById('page-indicator');
+    var $btnPrev    = document.getElementById('btn-prev');
+    var $btnNext    = document.getElementById('btn-next');
+    var $btnToc     = document.getElementById('btn-toc');
+    var $btnFontMinus  = document.getElementById('btn-font-minus');
+    var $btnFontPlus   = document.getElementById('btn-font-plus');
+    var $btnFontToggle = document.getElementById('btn-font-toggle');
+    var $tocBackdrop   = document.getElementById('toc-backdrop');
+    var $tocPanel      = document.getElementById('toc-panel');
+    var $tocList       = document.getElementById('toc-list');
+    var $tocClose      = document.getElementById('toc-close');
+    var $tapPrev    = document.getElementById('tap-prev');
+    var $tapNext    = document.getElementById('tap-next');
+    var $column     = document.getElementById('reading-column');
+    var $splash       = document.getElementById('splash');
+    var $splashTitle  = document.getElementById('splash-title');
+    var $splashAuthor = document.getElementById('splash-author');
+
+    // ─────────────────────────────────────────────────────────────────────────────
+    // PAGINATION  (Pretext — pure-JS, no DOM reflow, handles bidi/CJK/graphemes)
+    // ─────────────────────────────────────────────────────────────────────────────
+    function getFontString(fs) {
+      // Pretext warns against `system-ui` for accuracy on macOS — use named families.
+      return state.fontFamily === 'sans'
+        ? '400 ' + fs + 'px -apple-system, "Helvetica Neue", Arial, sans-serif'
+        : '400 ' + fs + 'px Literata, Georgia, "Times New Roman", serif';
+    }
+
+    // Cache of `prepare()` handles, keyed by (font, paragraph text).  `prepare()`
+    // is the expensive step; `layout()` is pure arithmetic over the handle, so we
+    // only redo `layout()` on resize / column-width changes.
+    var _preparedCache = new Map();
+    function getPrepared(text, fontStr) {
+      var key = fontStr + '\u0001' + text;
+      var hit = _preparedCache.get(key);
+      if (hit) return hit;
+      var p = prepare(text, fontStr);
+      _preparedCache.set(key, p);
+      return p;
+    }
+
+    function measureParaHeight(text, colWidth, fontStr, lhPx) {
+      var p = getPrepared(text, fontStr);
+      var r = layout(p, colWidth, lhPx);
+      // An empty paragraph still occupies one line visually.
+      return Math.max(1, r.lineCount) * lhPx;
+    }
+
+    function getColumnHeight() {
+      var vPad = window.innerWidth >= 768 ? 160 : 96;
+      return Math.max(200, window.innerHeight - vPad - 4);
+    }
+
+    // Per-chapter page cache. Cleared on resize / font-change so we don't
+    // accumulate stale layouts. Key encodes everything that affects layout.
+    var _pageCache = new Map();
+    function pageCacheKey(chIdx, colW, colH) {
+      return chIdx + '|' + colW + '|' + colH + '|' + state.fontSize + '|' + state.fontFamily;
+    }
+
+    function buildPages(chIdx) {
+      var colWidth  = $column.clientWidth;
+      var colHeight = getColumnHeight();
+      var key = pageCacheKey(chIdx, colWidth, colHeight);
+      var hit = _pageCache.get(key);
+      if (hit) return hit;
+      var pages = computePages(chIdx, colWidth, colHeight);
+      _pageCache.set(key, pages);
+      return pages;
+    }
+
+    // Balanced pagination.  Two phases:
+    //   (a) Greedy first-fit to find the minimum page count N that fits the
+    //       chapter within colHeight.
+    //   (b) DP to partition the paragraphs into exactly N contiguous groups,
+    //       minimizing Σ (pageHeight − target)².  This avoids the "tiny last
+    //       page" you get with pure greedy — heights cluster around the mean.
+    function computePages(chIdx, colWidth, colHeight) {
+      var chapter = BOOK.chapters[chIdx];
+      var fs      = state.fontSize;
+      var lhPx    = fs * 1.6;
+      var gapPx   = lhPx * 0.55;
+      var fontStr = getFontString(fs);
+
+      if (colWidth <= 0 || colHeight <= 0) return [];
+
+      var paras = chapter.paragraphs;
+      var M = paras.length;
+      if (M === 0) return [];
+
+      // Measure each paragraph once at the current width / font.
+      var H = new Float64Array(M);
+      for (var i = 0; i < M; i++) {
+        H[i] = measureParaHeight(paras[i], colWidth, fontStr, lhPx);
+      }
+
+      // Prefix sum → O(1) page-height queries.
+      var cum = new Float64Array(M + 1);
+      for (var i = 0; i < M; i++) cum[i + 1] = cum[i] + H[i];
+      function pageH(j, i) {
+        return cum[i] - cum[j] + (i - j - 1) * gapPx;
+      }
+
+      // (a) Greedy first-fit to determine the minimum page count N.
+      function greedyRanges(maxH) {
+        var ranges = [];
+        var start = 0, used = 0;
+        for (var i = 0; i < M; i++) {
+          var cost = H[i] + (i > start ? gapPx : 0);
+          if (i > start && used + cost > maxH) {
+            ranges.push([start, i]);
+            start = i;
+            used = H[i];
+          } else {
+            used += cost;
+          }
+        }
+        ranges.push([start, M]);
+        return ranges;
+      }
+
+      var N = greedyRanges(colHeight).length;
+      if (N <= 1) return [{ paragraphs: paras.slice() }];
+
+      // (b) DP for balanced partition into exactly N pages.
+      var target = (cum[M] + (M - N) * gapPx) / N;
+      var INF = Infinity;
+      var dp = [], path = [];
+      for (var p = 0; p <= N; p++) {
+        dp.push(new Float64Array(M + 1));
+        path.push(new Int32Array(M + 1));
+        for (var i = 0; i <= M; i++) { dp[p][i] = INF; path[p][i] = -1; }
+      }
+      dp[0][0] = 0;
+
+      for (var p = 1; p <= N; p++) {
+        for (var i = p; i <= M; i++) {
+          for (var j = p - 1; j < i; j++) {
+            var prev = dp[p - 1][j];
+            if (prev === INF) continue;
+            var h = pageH(j, i);
+            // Multi-paragraph pages may not overflow.  A single paragraph
+            // that's taller than the column has nowhere else to go, so we
+            // accept it on its own page (the squared diff stays in the cost).
+            if (h > colHeight && (i - j) > 1) continue;
+            var diff = h - target;
+            var cost = prev + diff * diff;
+            if (cost < dp[p][i]) {
+              dp[p][i] = cost;
+              path[p][i] = j;
+            }
+          }
+        }
+      }
+
+      if (!isFinite(dp[N][M])) {
+        // Shouldn't happen — greedy proved N pages fit.  Fall back if it does.
+        return greedyRanges(colHeight).map(function (r) {
+          return { paragraphs: paras.slice(r[0], r[1]) };
+        });
+      }
+
+      // Walk the path back to recover the cut points.
+      var splits = [M];
+      var idx = M;
+      for (var p = N; p >= 1; p--) {
+        var j = path[p][idx];
+        splits.unshift(j);
+        idx = j;
+      }
+      var pages = [];
+      for (var k = 0; k < splits.length - 1; k++) {
+        pages.push({ paragraphs: paras.slice(splits[k], splits[k + 1]) });
+      }
+      return pages;
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────────
+    // RENDER
+    // ─────────────────────────────────────────────────────────────────────────────
+    function applyFont() {
+      var ff = state.fontFamily === 'sans'
+        ? "system-ui, -apple-system, BlinkMacSystemFont, sans-serif"
+        : "'Literata', Georgia, Cambria, 'Times New Roman', serif";
+      $content.style.fontFamily   = ff;
+      document.body.style.fontFamily = ff;
+      $content.style.fontSize = state.fontSize + 'px';
+      var $lbl = document.getElementById('font-toggle-label');
+      if ($lbl) $lbl.textContent = state.fontFamily === 'sans' ? 'Serif' : 'Sans';
+    }
+
+    function renderPage(animate) {
+      var page = state.pages[state.pageIndex];
+      if (!page) return;
+
+      function doRender() {
+        $content.innerHTML = '';
+        for (var i = 0; i < page.paragraphs.length; i++) {
+          var p = document.createElement('p');
+          p.textContent = page.paragraphs[i];
+          $content.appendChild(p);
+        }
+        updateUI();
+        if (animate) $content.classList.remove('fading');
+      }
+
+      if (animate) {
+        $content.classList.add('fading');
+        setTimeout(doRender, 210);
+      } else {
+        doRender();
+      }
+    }
+
+    function countPagesBefore(chIdx) {
+      var n = 0;
+      for (var i = 0; i < chIdx; i++) n += buildPages(i).length;
+      return n;
+    }
+
+    function updateUI() {
+      // Progress
+      var total  = 0;
+      for (var i = 0; i < BOOK.chapters.length; i++) total += buildPages(i).length;
+      var done   = countPagesBefore(state.chapterIndex) + state.pageIndex + 1;
+      $progress.style.width = (total > 0 ? (done / total) * 100 : 0) + '%';
+
+      // Indicator
+      $indicator.textContent =
+        BOOK.chapters[state.chapterIndex].title + '  \u00B7  ' +
+        (state.pageIndex + 1) + ' / ' + state.pages.length;
+
+      // Nav arrows
+      var isFirst = state.chapterIndex === 0 && state.pageIndex === 0;
+      var isLast  = state.chapterIndex === BOOK.chapters.length - 1 &&
+                    state.pageIndex >= state.pages.length - 1;
+      $btnPrev.disabled = isFirst;
+      $btnNext.disabled = isLast;
+
+      // Theme buttons
+      var themeBtns = document.querySelectorAll('[data-theme]');
+      for (var i = 0; i < themeBtns.length; i++) {
+        themeBtns[i].classList.toggle('active', themeBtns[i].dataset.theme === state.theme);
+      }
+
+      // TOC
+      renderTOC();
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────────
+    // NAVIGATION
+    // ─────────────────────────────────────────────────────────────────────────────
+    function goNext() {
+      if (state.pageIndex < state.pages.length - 1) {
+        state.pageIndex++;
+        save(); renderPage(true);
+      } else if (state.chapterIndex < BOOK.chapters.length - 1) {
+        state.chapterIndex++;
+        state.pageIndex = 0;
+        state.pages = buildPages(state.chapterIndex);
+        save(); renderPage(true);
+      }
+    }
+
+    function goPrev() {
+      if (state.pageIndex > 0) {
+        state.pageIndex--;
+        save(); renderPage(true);
+      } else if (state.chapterIndex > 0) {
+        state.chapterIndex--;
+        state.pages = buildPages(state.chapterIndex);
+        state.pageIndex = Math.max(0, state.pages.length - 1);
+        save(); renderPage(true);
+      }
+    }
+
+    function goChapter(idx) {
+      state.chapterIndex = idx;
+      state.pageIndex    = 0;
+      state.pages = buildPages(idx);
+      save(); renderPage(true);
+      closeTOC();
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────────
+    // TOC
+    // ─────────────────────────────────────────────────────────────────────────────
+    function renderTOC() {
+      $tocList.innerHTML = '';
+      for (var i = 0; i < BOOK.chapters.length; i++) {
+        (function(idx) {
+          var li  = document.createElement('li');
+          var btn = document.createElement('button');
+          btn.textContent = BOOK.chapters[idx].title;
+          if (idx === state.chapterIndex) btn.classList.add('current');
+          btn.addEventListener('click', function() { goChapter(idx); });
+          li.appendChild(btn);
+          $tocList.appendChild(li);
+        })(i);
+      }
+    }
+
+    function openTOC() {
+      $tocBackdrop.classList.add('open');
+      $tocPanel.classList.add('open');
+      hideControls();
+    }
+    function closeTOC() {
+      $tocBackdrop.classList.remove('open');
+      $tocPanel.classList.remove('open');
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────────
+    // CONTROLS REVEAL
+    // ─────────────────────────────────────────────────────────────────────────────
+    var controlsTimer = null;
+
+    function showControls() {
+      $controls.classList.add('visible');
+      clearTimeout(controlsTimer);
+      controlsTimer = setTimeout(hideControls, 2500);
+    }
+    function hideControls() {
+      clearTimeout(controlsTimer);
+      $controls.classList.remove('visible');
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────────
+    // THEME
+    // ─────────────────────────────────────────────────────────────────────────────
+    function setTheme(t) {
+      state.theme = t;
+      document.documentElement.className = t;
+      localStorage.setItem('nr-theme', t);
+      updateUI();
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────────
+    // PERSISTENCE
+    // ─────────────────────────────────────────────────────────────────────────────
+    function save() {
+      localStorage.setItem('nr-chapter', state.chapterIndex);
+      localStorage.setItem('nr-page',    state.pageIndex);
+      localStorage.setItem('nr-size',    state.fontSize);
+      localStorage.setItem('nr-font',    state.fontFamily);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────────
+    // REPAGINATE  (debounced — on resize or font change)
+    // ─────────────────────────────────────────────────────────────────────────────
+    var repaginateTimer = null;
+
+    function repaginate() {
+      clearTimeout(repaginateTimer);
+      repaginateTimer = setTimeout(function() {
+        // Column width/height may have changed: drop cached layouts.
+        _pageCache.clear();
+        var frac = state.pages.length > 0 ? state.pageIndex / state.pages.length : 0;
+        state.pages = buildPages(state.chapterIndex);
+        state.pageIndex = Math.min(
+          Math.round(frac * state.pages.length),
+          Math.max(0, state.pages.length - 1)
+        );
+        renderPage(false);
+      }, 80);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────────
+    // EVENT LISTENERS
+    // ─────────────────────────────────────────────────────────────────────────────
+    $btnNext.addEventListener('click', function() { goNext(); showControls(); });
+    $btnPrev.addEventListener('click', function() { goPrev(); showControls(); });
+    $tapNext.addEventListener('click', function() { goNext(); });
+    $tapPrev.addEventListener('click', function() { goPrev(); });
+
+    $btnToc.addEventListener('click', function(e) { e.stopPropagation(); openTOC(); });
+    $tocBackdrop.addEventListener('click', closeTOC);
+    $tocClose.addEventListener('click', closeTOC);
+
+    function invalidatePreparedCache() {
+      _preparedCache.clear();
+      _pageCache.clear();
+      // Pretext also keeps an internal cache of segment shapes that we should
+      // drop when the user might keep cycling through font configurations.
+      try { clearCache(); } catch (_) { /* older versions may lack this */ }
+    }
+
+    $btnFontMinus.addEventListener('click', function() {
+      if (state.fontSize > FONT_MIN) {
+        state.fontSize -= 2; save(); applyFont(); invalidatePreparedCache(); repaginate();
+      }
+      showControls();
+    });
+    $btnFontPlus.addEventListener('click', function() {
+      if (state.fontSize < FONT_MAX) {
+        state.fontSize += 2; save(); applyFont(); invalidatePreparedCache(); repaginate();
+      }
+      showControls();
+    });
+    $btnFontToggle.addEventListener('click', function() {
+      state.fontFamily = state.fontFamily === 'serif' ? 'sans' : 'serif';
+      save(); applyFont(); invalidatePreparedCache(); repaginate(); showControls();
+    });
+
+    var themeBtns = document.querySelectorAll('[data-theme]');
+    for (var i = 0; i < themeBtns.length; i++) {
+      (function(btn) {
+        btn.addEventListener('click', function() {
+          setTheme(btn.dataset.theme); showControls();
+        });
+      })(themeBtns[i]);
+    }
+
+    document.addEventListener('mousemove', showControls);
+    document.addEventListener('touchstart', showControls, { passive: true });
+
+    document.addEventListener('keydown', function(e) {
+      if (e.key === 'ArrowRight' || e.key === 'ArrowDown') { goNext(); showControls(); }
+      if (e.key === 'ArrowLeft'  || e.key === 'ArrowUp')   { goPrev(); showControls(); }
+    });
+
+    window.addEventListener('resize', repaginate);
+
+    // ─────────────────────────────────────────────────────────────────────────────
+    // INIT
+    // ─────────────────────────────────────────────────────────────────────────────
+    function init() {
+      applyFont();
+
+      if (BOOK.chapters.length === 0) {
+        $content.innerHTML = '<p style="opacity:0.6">No chapters available.</p>';
+        $splash.classList.add('hide');
+        setTimeout(function () { $splash.style.display = 'none'; }, 720);
+        return;
+      }
+
+      state.chapterIndex = Math.min(state.chapterIndex, BOOK.chapters.length - 1);
+      state.pages = buildPages(state.chapterIndex);
+      state.pageIndex = Math.min(state.pageIndex, Math.max(0, state.pages.length - 1));
+      renderPage(false);
+
+      setTimeout(function() {
+        $splash.classList.add('hide');
+        setTimeout(function() { $splash.style.display = 'none'; }, 720);
+      }, 1600);
+    }
+
+    function showLoadError(err) {
+      console.error('Failed to load book:', err);
+      $content.innerHTML =
+        '<p style="opacity:0.7">Could not load the book.<br/><small>' +
+        (err && err.message ? err.message : 'Unknown error') +
+        '</small><br/><small>Is the API server running on ' + (API_BASE || location.origin) + '?</small></p>';
+      $splash.classList.add('hide');
+      setTimeout(function () { $splash.style.display = 'none'; }, 720);
+    }
+
+    function boot() {
+      loadBook().then(init).catch(showLoadError);
+    }
+
+    if (document.fonts && document.fonts.ready) {
+      document.fonts.ready.then(boot);
+    } else {
+      window.addEventListener('load', function() { setTimeout(boot, 150); });
+    }
+  </script>
+</body>
+</html>

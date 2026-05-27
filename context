@@ -1,0 +1,5 @@
+# building leemos
+# my code goes to ts which allows for type checking, 
+# and modern syntax,  it converts
+# into.js run node.js where express
+# sits on top and node puts it on a http server. 
