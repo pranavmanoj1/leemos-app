@@ -24,30 +24,30 @@
 </head>
 <body>
 
-  <div id="progress-bar"></div>
+  <div id="progress-bar" role="progressbar" aria-hidden="true"></div>
 
-  <div id="splash">
+  <section id="splash">
     <h1 id="splash-title"></h1>
     <p id="splash-author"></p>
-  </div>
+  </section>
 
-  <div id="reader">
+  <main id="reader">
     <div id="reading-column">
-      <div id="page-content"></div>
+      <article id="page-content"></article>
     </div>
-  </div>
+  </main>
 
-  <div class="tap-zone" id="tap-prev"></div>
-  <div class="tap-zone" id="tap-next"></div>
+  <button class="tap-zone" id="tap-prev" aria-label="Previous page"></button>
+  <button class="tap-zone" id="tap-next" aria-label="Next page"></button>
 
   <div id="controls">
     <button class="nav-arrow" id="btn-prev">&#8592;</button>
     <button class="nav-arrow" id="btn-next">&#8594;</button>
 
-    <div id="bottom-bar">
+    <footer id="bottom-bar">
       <span id="page-indicator"></span>
 
-      <div id="toolbar-strip">
+      <nav id="toolbar-strip" aria-label="Reader controls">
 
         <!-- Table of Contents -->
         <button class="tool-btn" id="btn-toc">
@@ -124,18 +124,18 @@
           <span>Dark</span>
         </button>
 
-      </div>
-    </div>
+      </nav>
+    </footer>
   </div>
 
   <div id="toc-backdrop"></div>
-  <div id="toc-panel">
-    <div id="toc-header">
-      <span id="toc-title">Contents</span>
+  <nav id="toc-panel" aria-label="Table of contents">
+    <header id="toc-header">
+      <h2 id="toc-title">Contents</h2>
       <button id="toc-close">&#215;</button>
-    </div>
+    </header>
     <ul id="toc-list"></ul>
-  </div>
+  </nav>
 
   <script type="module">
     // ─────────────────────────────────────────────────────────────────────────────
