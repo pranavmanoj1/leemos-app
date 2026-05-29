@@ -179,26 +179,40 @@ html, body {
 }
 @keyframes blink { 50% { opacity: 0; } }
 
+/* ── PROSE TEXT SELECTION ── */
+#prose p::selection,
+#prose mark::selection {
+  background: rgba(160, 110, 40, 0.10);
+  text-decoration: underline;
+  text-decoration-color: rgba(160, 110, 40, 0.65);
+  text-underline-offset: 2px;
+}
+html.dark #prose p::selection,
+html.dark #prose mark::selection {
+  background: rgba(200, 169, 120, 0.10);
+  text-decoration-color: rgba(200, 169, 120, 0.6);
+}
+
 /* ── HIGHLIGHTS ── */
 mark.hl {
-  background: rgba(160, 110, 40, 0.12);
+  background: rgba(180, 130, 30, 0.28);
   color: inherit;
   padding: 0 1px;
   cursor: pointer;
   border-radius: 1px;
 }
-mark.hl:hover { background: rgba(160, 110, 40, 0.22); }
+mark.hl:hover { background: rgba(180, 130, 30, 0.42); }
 mark.hl-noted {
-  background: rgba(160, 110, 40, 0.12);
-  border-bottom: 1.5px solid rgba(160, 110, 40, 0.45);
+  background: rgba(180, 130, 30, 0.28);
+  border-bottom: 2px solid rgba(160, 100, 20, 0.55);
 }
-mark.hl-noted:hover { background: rgba(160, 110, 40, 0.22); }
+mark.hl-noted:hover { background: rgba(180, 130, 30, 0.42); }
 
-html.dark mark.hl        { background: rgba(200, 169, 120, 0.14); }
-html.dark mark.hl:hover  { background: rgba(200, 169, 120, 0.24); }
-html.dark mark.hl-noted  { border-bottom-color: rgba(200, 169, 120, 0.45); }
-html.sepia mark.hl       { background: rgba(120, 80, 20, 0.12); }
-html.sepia mark.hl:hover { background: rgba(120, 80, 20, 0.22); }
+html.dark mark.hl        { background: rgba(200, 169, 120, 0.22); }
+html.dark mark.hl:hover  { background: rgba(200, 169, 120, 0.36); }
+html.dark mark.hl-noted  { border-bottom-color: rgba(200, 169, 120, 0.55); }
+html.sepia mark.hl       { background: rgba(140, 90, 20, 0.26); }
+html.sepia mark.hl:hover { background: rgba(140, 90, 20, 0.40); }
 
 /* ── SELECTION TOOLBAR ── */
 #sel-toolbar {

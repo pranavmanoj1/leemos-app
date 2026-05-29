@@ -931,8 +931,13 @@ function showAnnPopover(ann, refRect) {
 }
 
 $selBtnHL.addEventListener('click', function () {
-  commitHighlight('');
-  hideSelToolbar();
+  $selToolbar.hidden = true; // hide immediately before DOM work
+  var saved = _pendingAnn;
+  _pendingAnn = null;
+  if (saved) {
+    _pendingAnn = saved;
+    commitHighlight('');
+  }
 });
 
 $selBtnAnn.addEventListener('click', function () {
