@@ -156,12 +156,24 @@ html, body {
 #prose-inner article p + p { margin-top: 0.6em; }
 
 .para-new {
-  animation: fadeInPara 0.5s ease forwards;
+  animation: fadeInPara 0.4s ease forwards;
 }
 @keyframes fadeInPara {
-  from { opacity: 0; transform: translateY(6px); }
+  from { opacity: 0; transform: translateY(4px); }
   to   { opacity: 1; transform: translateY(0); }
 }
+
+.para-streaming {
+  opacity: 1;
+}
+.para-streaming::after {
+  content: '▋';
+  display: inline-block;
+  margin-left: 1px;
+  opacity: 0.55;
+  animation: blink 0.7s step-end infinite;
+}
+@keyframes blink { 50% { opacity: 0; } }
 
 /* ── REVEAL FOOTER ── */
 #reveal-footer {
@@ -314,8 +326,6 @@ html, body {
   animation: blink 0.8s step-end infinite;
   opacity: 0.6;
 }
-@keyframes blink { 50% { opacity: 0; } }
-
 /* ── CHAT INPUT ── */
 #chat-input-area {
   padding: 12px 14px;

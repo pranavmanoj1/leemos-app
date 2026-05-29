@@ -121,6 +121,7 @@ var BOOK = { title: '', author: '', chapters: [] };
 var state = {
   chapterIndex:    parseInt(localStorage.getItem('leemos-ch')    || '0', 10),
   revealedCount:   0,                 // paragraphs visible in current chapter
+  streaming:       false,             // true while a paragraph is being typed in
   fontSize:        parseInt(localStorage.getItem('leemos-size')  || '20', 10),
   fontFamily:      localStorage.getItem('leemos-font')           || 'serif',
   theme:           localStorage.getItem('leemos-theme')          || 'light',
@@ -297,11 +298,66 @@ function renderChapter() {
 }
 
 function revealNext() {
+  if (state.streaming) return;
   var ch = currentChapter();
-  if (state.revealedCount < ch.paragraphs.length) {
-    state.revealedCount++;
-    renderChapter();
+  if (state.revealedCount >= ch.paragraphs.length) return;
+
+  state.revealedCount++;
+  state.streaming = true;
+
+  // Keep previous paragraphs; just append the new one
+  var idx  = state.revealedCount - 1;
+  var text = ch.paragraphs[idx];
+
+  // Remove old "last" highlight
+  var prevLast = $prose.lastElementChild;
+  if (prevLast) prevLast.classList.remove('para-new');
+
+  var p = document.createElement('p');
+  p.classList.add('para-streaming');
+  $prose.appendChild(p);
+
+  // Disable the reveal button while streaming
+  $btnReveal.disabled = true;
+
+  // Tokenise on whitespace boundaries, preserving spaces
+  var tokens = text.match(/\S+\s*/g) || [];
+  var wi = 0;
+  var WORD_MS = 22; // ~45 wpm — snappy but readable
+
+  function tick() {
+    if (wi < tokens.length) {
+      p.textContent += tokens[wi++];
+      // Auto-scroll to keep new text visible
+      p.scrollIntoView({ behavior: 'instant', block: 'nearest' });
+      setTimeout(tick, WORD_MS);
+    } else {
+      // Streaming done
+      p.classList.remove('para-streaming');
+      p.classList.add('para-new');
+      state.streaming = false;
+      $btnReveal.disabled = false;
+
+      // Update footer (progress counter + buttons)
+      var total  = ch.paragraphs.length;
+      var shown  = Math.min(state.revealedCount, total);
+      $paraProgress.textContent = shown + '\u202f/\u202f' + total;
+
+      var totalParas = 0, doneBefore = 0;
+      for (var ci = 0; ci < BOOK.chapters.length; ci++) {
+        totalParas += BOOK.chapters[ci].paragraphs.length;
+        if (ci < state.chapterIndex) doneBefore += BOOK.chapters[ci].paragraphs.length;
+      }
+      $progress.style.width = ((doneBefore + shown) / totalParas * 100) + '%';
+
+      var allShown = shown >= total;
+      $btnReveal.style.display = allShown ? 'none' : '';
+      $btnEnd.classList.toggle('visible', allShown);
+    }
   }
+
+  // Brief pause before first word so the paragraph slot is visible
+  setTimeout(tick, 60);
 }
 
 // ─── Font & theme ─────────────────────────────────────────────────────────────
@@ -661,7 +717,7 @@ document.addEventListener('keydown', function (e) {
   // If focus is inside chat input → let the textarea handle it via its own listener
   if (document.activeElement === $chatInput) return;
   // Otherwise: advance reading
-  if (state.phase === 'reading') {
+  if (state.phase === 'reading' && !state.streaming) {
     e.preventDefault();
     revealNext();
   }
