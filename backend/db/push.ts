@@ -8,7 +8,7 @@ import { books, chapters } from './schema';
 // Load backend/.env regardless of where the script is invoked from.
 dotenv.config({ path: path.resolve(__dirname, '..', '.env') });
 
-const CHAPTERS_DIR = path.resolve(__dirname);
+const CHAPTERS_DIR = path.resolve(__dirname, 'data', 'notes-from-the-undergound');
 const CHAPTER_FILE_RE = /^ch_(\d{3})\.txt$/;
 
 const BOOK = {

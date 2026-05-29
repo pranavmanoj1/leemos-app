@@ -83,9 +83,9 @@ app.get('/api/books/:id', async (req: Request, res: Response) => {
 const viewDir = path.resolve(__dirname, '..', 'frontend', 'src', 'view');
 app.use(express.static(viewDir));
 
-const port = Number(process.env.PORT) || 3000;
-app.listen(port, () => {
-    console.log(`Server listening on http://localhost:${port}`);
-    console.log(`  API:  http://localhost:${port}/api/books/1`);
-    console.log(`  View: http://localhost:${port}/`);
+const port = Number(process.env.PORT) || 5000;
+app.listen(port, '0.0.0.0', () => {
+    console.log(`Server listening on http://0.0.0.0:${port}`);
+    console.log(`  API:  http://0.0.0.0:${port}/api/books/1`);
+    console.log(`  View: http://0.0.0.0:${port}/`);
 });
