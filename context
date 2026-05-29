@@ -3,3 +3,5 @@
 # and modern syntax,  it converts
 # into.js run node.js where express
 # sits on top and node puts it on a http server. 
+# drizzle is the way we can write ts as sql query 
+# prisma js is the networking
