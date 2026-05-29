@@ -128,7 +128,7 @@ ${revealedText || '(No text revealed yet — the chapter has just begun.)'}
 
     try {
         const stream = await openai.chat.completions.create({
-            model: 'gpt-5-mini',
+            model: 'gpt-4o-mini',
             messages: [
                 { role: 'system', content: systemPrompt },
                 ...messages,
@@ -179,7 +179,7 @@ app.post('/api/stance', async (req: Request, res: Response) => {
 
     try {
         const response = await openai.chat.completions.create({
-            model: 'gpt-5-mini',
+            model: 'gpt-4o-mini',
             messages: [
                 {
                     role: 'system',
@@ -258,7 +258,7 @@ Respond as the Underground Man: in his voice, with his tics and contradictions. 
 
     try {
         const stream = await openai.chat.completions.create({
-            model: 'gpt-5.4',
+            model: 'gpt-4o',
             messages: chatMessages,
             stream: true,
             max_completion_tokens: 500,
