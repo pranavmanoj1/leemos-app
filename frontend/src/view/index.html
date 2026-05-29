@@ -94,6 +94,22 @@
 
 </div>
 
+<!-- Selection toolbar (appears above selected prose text) -->
+<div id="sel-toolbar" hidden>
+  <button id="sel-btn-highlight">Highlight</button>
+  <button id="sel-btn-annotate">+ Note</button>
+</div>
+
+<!-- Annotation popover (add / edit note on a highlight) -->
+<div id="ann-popover" hidden>
+  <textarea id="ann-textarea" placeholder="Add a note…" rows="3" spellcheck="true"></textarea>
+  <div class="ann-popover-btns">
+    <button id="ann-btn-save">Save</button>
+    <button id="ann-btn-delete">Remove highlight</button>
+    <button id="ann-btn-cancel">Cancel</button>
+  </div>
+</div>
+
 <!-- TOC -->
 <div id="toc-backdrop"></div>
 <nav id="toc-panel" aria-label="Table of contents">
@@ -114,6 +130,71 @@ var FONT_MIN  = 16;
 var FONT_MAX  = 26;
 var API_BASE  = '';
 
+// ─── Annotation storage (must exist before state) ────────────────────────────
+
+function loadAnnotations() {
+  try { return JSON.parse(localStorage.getItem('leemos-annotations') || '[]'); }
+  catch(_) { return []; }
+}
+function saveAnnotations() {
+  localStorage.setItem('leemos-annotations', JSON.stringify(state.annotations));
+}
+
+// ─── HTML helpers for highlighted prose ──────────────────────────────────────
+
+function escapeHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function getParaAnns(chIdx, paraIdx) {
+  return state.annotations.filter(function(a) {
+    return a.chapterIndex === chIdx && a.paraIndex === paraIdx;
+  });
+}
+
+function buildParaHTML(text, anns) {
+  if (!anns || !anns.length) return escapeHtml(text);
+  var sorted = anns.slice().sort(function(a,b){ return a.start - b.start; });
+  var html = '', pos = 0;
+  for (var i = 0; i < sorted.length; i++) {
+    var h = sorted[i];
+    var s = Math.max(pos, h.start), e = Math.min(text.length, h.end);
+    if (s >= e) continue;
+    if (s > pos) html += escapeHtml(text.slice(pos, s));
+    html += '<mark class="hl' + (h.note ? ' hl-noted' : '') + '" data-ann="' + h.id + '">';
+    html += escapeHtml(text.slice(s, e));
+    html += '</mark>';
+    pos = e;
+  }
+  if (pos < text.length) html += escapeHtml(text.slice(pos));
+  return html;
+}
+
+function rerenderPara(paraEl, paraIdx) {
+  var text = currentChapter().paragraphs[paraIdx];
+  paraEl.innerHTML = buildParaHTML(text, getParaAnns(state.chapterIndex, paraIdx));
+}
+
+// Plain-text char offset within a paragraph element (walks text nodes)
+function getPlainOffset(paraEl, targetNode, offsetInNode) {
+  var walker = document.createTreeWalker(paraEl, NodeFilter.SHOW_TEXT, null);
+  var count = 0, node;
+  while ((node = walker.nextNode())) {
+    if (node === targetNode) return count + offsetInNode;
+    count += node.length;
+  }
+  return count;
+}
+
+function findParaEl(node) {
+  var el = node.nodeType === Node.TEXT_NODE ? node.parentElement : node;
+  while (el && el !== $prose) {
+    if (el.tagName === 'P' && el.dataset && el.dataset.para !== undefined) return el;
+    el = el.parentElement;
+  }
+  return null;
+}
+
 // ─── State ────────────────────────────────────────────────────────────────────
 var BOOK = { title: '', author: '', chapters: [] };
 
@@ -122,6 +203,7 @@ var state = {
   chapterIndex:    parseInt(localStorage.getItem('leemos-ch')    || '0', 10),
   revealedCount:   0,                 // paragraphs visible in current chapter
   streaming:       false,             // true while a paragraph is being typed in
+  annotations:     loadAnnotations(), // [{id,chapterIndex,paraIndex,start,end,note}]
   fontSize:        parseInt(localStorage.getItem('leemos-size')  || '20', 10),
   fontFamily:      localStorage.getItem('leemos-font')           || 'serif',
   theme:           localStorage.getItem('leemos-theme')          || 'light',
@@ -162,6 +244,14 @@ var $btnToc       = document.getElementById('btn-toc');
 var $btnFontMinus = document.getElementById('btn-font-minus');
 var $btnFontPlus  = document.getElementById('btn-font-plus');
 var $btnFontToggle= document.getElementById('btn-font-toggle');
+var $selToolbar   = document.getElementById('sel-toolbar');
+var $selBtnHL     = document.getElementById('sel-btn-highlight');
+var $selBtnAnn    = document.getElementById('sel-btn-annotate');
+var $annPopover   = document.getElementById('ann-popover');
+var $annTextarea  = document.getElementById('ann-textarea');
+var $annBtnSave   = document.getElementById('ann-btn-save');
+var $annBtnDelete = document.getElementById('ann-btn-delete');
+var $annBtnCancel = document.getElementById('ann-btn-cancel');
 
 // ─── Book loading ─────────────────────────────────────────────────────────────
 
@@ -243,10 +333,9 @@ function renderChapter() {
   $prose.innerHTML = '';
   for (var i = 0; i < Math.min(state.revealedCount, paras.length); i++) {
     var p = document.createElement('p');
-    p.textContent = paras[i];
-    if (i === state.revealedCount - 1) {
-      p.classList.add('para-new');
-    }
+    p.dataset.para = i;
+    p.innerHTML = buildParaHTML(paras[i], getParaAnns(state.chapterIndex, i));
+    if (i === state.revealedCount - 1) p.classList.add('para-new');
     $prose.appendChild(p);
   }
 
@@ -314,6 +403,7 @@ function revealNext() {
   if (prevLast) prevLast.classList.remove('para-new');
 
   var p = document.createElement('p');
+  p.dataset.para = idx;
   p.classList.add('para-streaming');
   $prose.appendChild(p);
 
@@ -323,7 +413,7 @@ function revealNext() {
   // Tokenise on whitespace boundaries, preserving spaces
   var tokens = text.match(/\S+\s*/g) || [];
   var wi = 0;
-  var WORD_MS = 22; // ~45 wpm — snappy but readable
+  var WORD_MS = 65; // ~15 words/sec — above typing speed, readable flow
 
   function tick() {
     if (wi < tokens.length) {
@@ -332,8 +422,9 @@ function revealNext() {
       p.scrollIntoView({ behavior: 'instant', block: 'nearest' });
       setTimeout(tick, WORD_MS);
     } else {
-      // Streaming done
+      // Streaming done — re-render with any highlights that were saved
       p.classList.remove('para-streaming');
+      p.innerHTML = buildParaHTML(text, getParaAnns(state.chapterIndex, idx));
       p.classList.add('para-new');
       state.streaming = false;
       $btnReveal.disabled = false;
@@ -763,6 +854,142 @@ document.querySelectorAll('[data-theme]').forEach(function (btn) {
   btn.addEventListener('click', function () {
     setTheme(btn.getAttribute('data-theme'));
   });
+});
+
+// ─── Highlight & annotation ───────────────────────────────────────────────────
+
+var _pendingAnn = null; // { paraEl, paraIndex, start, end }
+var _editingAnn = null; // { ann } or { pending }
+
+function hideSelToolbar() {
+  $selToolbar.hidden = true;
+  _pendingAnn = null;
+}
+
+function positionNear(el, refRect) {
+  var h = el.offsetHeight || 80;
+  var top = refRect.top - h - 10;
+  if (top < 8) top = refRect.bottom + 8;
+  var left = Math.max(8, Math.min(refRect.left + refRect.width / 2 - el.offsetWidth / 2, window.innerWidth - (el.offsetWidth || 200) - 8));
+  el.style.top  = top + 'px';
+  el.style.left = left + 'px';
+}
+
+// Show the toolbar above the selected text
+$prose.addEventListener('mouseup', function () {
+  if (state.streaming) return;
+  setTimeout(function () {              // wait for selection to settle
+    var sel = window.getSelection();
+    if (!sel || sel.isCollapsed || !sel.rangeCount) { hideSelToolbar(); return; }
+    var range = sel.getRangeAt(0);
+    var startPara = findParaEl(range.startContainer);
+    var endPara   = findParaEl(range.endContainer);
+    if (!startPara || startPara !== endPara) { hideSelToolbar(); return; }
+    var start = getPlainOffset(startPara, range.startContainer, range.startOffset);
+    var end   = getPlainOffset(startPara, range.endContainer,   range.endOffset);
+    if (end <= start) { hideSelToolbar(); return; }
+    _pendingAnn = { paraEl: startPara, paraIndex: parseInt(startPara.dataset.para), start: start, end: end };
+    var rect = range.getBoundingClientRect();
+    $selToolbar.hidden = false;
+    positionNear($selToolbar, rect);
+  }, 10);
+});
+
+// Hide toolbar when clicking outside
+document.addEventListener('mousedown', function (e) {
+  if (!$selToolbar.hidden && !$selToolbar.contains(e.target)) hideSelToolbar();
+  if (!$annPopover.hidden && !$annPopover.contains(e.target) && !e.target.closest('mark')) {
+    $annPopover.hidden = true;
+    _editingAnn = null;
+  }
+});
+
+function commitHighlight(note) {
+  if (!_pendingAnn) return;
+  var ann = {
+    id: Date.now(),
+    chapterIndex: state.chapterIndex,
+    paraIndex:    _pendingAnn.paraIndex,
+    start:        _pendingAnn.start,
+    end:          _pendingAnn.end,
+    note:         note || ''
+  };
+  state.annotations.push(ann);
+  saveAnnotations();
+  rerenderPara(_pendingAnn.paraEl, _pendingAnn.paraIndex);
+  _pendingAnn = null;
+  window.getSelection().removeAllRanges();
+}
+
+function showAnnPopover(ann, refRect) {
+  _editingAnn = { ann: ann };
+  $annTextarea.value  = ann ? ann.note : '';
+  $annBtnDelete.hidden = !ann;
+  $annPopover.hidden  = false;
+  positionNear($annPopover, refRect);
+  $annTextarea.focus();
+}
+
+$selBtnHL.addEventListener('click', function () {
+  commitHighlight('');
+  hideSelToolbar();
+});
+
+$selBtnAnn.addEventListener('click', function () {
+  if (!_pendingAnn) return;
+  var pending = _pendingAnn;
+  hideSelToolbar();
+  window.getSelection().removeAllRanges();
+  _pendingAnn = pending;       // restore so commitHighlight can use it
+  // Get a rect near the selection
+  var rect = pending.paraEl.getBoundingClientRect();
+  _editingAnn = { pending: pending };
+  $annTextarea.value   = '';
+  $annBtnDelete.hidden = true;
+  $annPopover.hidden   = false;
+  positionNear($annPopover, rect);
+  $annTextarea.focus();
+});
+
+$annBtnSave.addEventListener('click', function () {
+  var note = $annTextarea.value.trim();
+  if (_editingAnn && _editingAnn.pending) {
+    commitHighlight(note);
+  } else if (_editingAnn && _editingAnn.ann) {
+    _editingAnn.ann.note = note;
+    if (!note) _editingAnn.ann.note = '';
+    saveAnnotations();
+    var paraEl = $prose.querySelector('p[data-para="' + _editingAnn.ann.paraIndex + '"]');
+    if (paraEl) rerenderPara(paraEl, _editingAnn.ann.paraIndex);
+  }
+  $annPopover.hidden = true;
+  _editingAnn = null;
+});
+
+$annBtnDelete.addEventListener('click', function () {
+  if (!_editingAnn || !_editingAnn.ann) return;
+  state.annotations = state.annotations.filter(function (a) { return a.id !== _editingAnn.ann.id; });
+  saveAnnotations();
+  var paraEl = $prose.querySelector('p[data-para="' + _editingAnn.ann.paraIndex + '"]');
+  if (paraEl) rerenderPara(paraEl, _editingAnn.ann.paraIndex);
+  $annPopover.hidden = true;
+  _editingAnn = null;
+});
+
+$annBtnCancel.addEventListener('click', function () {
+  $annPopover.hidden = true;
+  _editingAnn = null;
+  _pendingAnn = null;
+});
+
+// Click existing highlight to edit its note
+$prose.addEventListener('click', function (e) {
+  var mark = e.target.closest && e.target.closest('mark[data-ann]');
+  if (!mark) return;
+  var annId = parseInt(mark.dataset.ann);
+  var ann = state.annotations.find(function (a) { return a.id === annId; });
+  if (!ann) return;
+  showAnnPopover(ann, mark.getBoundingClientRect());
 });
 
 // ─── Splash dismiss on click / Enter ─────────────────────────────────────────
