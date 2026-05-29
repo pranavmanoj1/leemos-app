@@ -17,8 +17,14 @@
   "type": "commonjs",
   "dependencies": {
     "drizzle-orm": "^0.45.2",
+    "drizzle-zod": "^0.8.3",
     "express": "^5.2.1",
-    "postgres": "^3.4.9"
+    "openai": "^6.39.1",
+    "p-limit": "^7.3.0",
+    "p-retry": "^7.1.1",
+    "postgres": "^3.4.9",
+    "zod": "^4.4.3",
+    "zod-validation-error": "^5.0.0"
   },
   "devDependencies": {
     "@types/express": "^5.0.6",
