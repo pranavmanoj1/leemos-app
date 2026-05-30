@@ -92,6 +92,23 @@
 
 </div>
 
+<!-- Mobile bottom tab bar (hidden on desktop via CSS) -->
+<nav id="mobile-tabs" aria-label="Mobile navigation">
+  <button class="mob-tab active" id="mob-tab-read">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/>
+    </svg>
+    <span>Read</span>
+  </button>
+  <button class="mob-tab" id="mob-tab-chat">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+    </svg>
+    <span>Chat</span>
+    <span id="mob-chat-dot" aria-hidden="true"></span>
+  </button>
+</nav>
+
 <!-- Selection toolbar (appears above selected prose text) -->
 <div id="sel-toolbar" hidden>
   <button id="sel-btn-highlight">Highlight</button>
@@ -1048,6 +1065,52 @@ loadBook()
     console.error('Failed to load book:', err);
     document.body.innerHTML = '<p style="padding:40px;opacity:0.5">Could not load the book. Please try refreshing.</p>';
   });
+
+// ─── Mobile tab switcher ─────────────────────────────────────────────────────
+
+var $mobTabRead = document.getElementById('mob-tab-read');
+var $mobTabChat = document.getElementById('mob-tab-chat');
+var $mobChatDot = document.getElementById('mob-chat-dot');
+var _mobActive  = 'read'; // 'read' | 'chat'
+
+function setMobTab(tab) {
+  _mobActive = tab;
+  if (tab === 'chat') {
+    document.body.classList.add('mob-chat');
+    $mobTabChat.classList.add('active');
+    $mobTabRead.classList.remove('active');
+    $mobChatDot.classList.remove('show'); // clear dot on switch
+  } else {
+    document.body.classList.remove('mob-chat');
+    $mobTabRead.classList.add('active');
+    $mobTabChat.classList.remove('active');
+  }
+}
+
+$mobTabRead.addEventListener('click', function () { setMobTab('read'); });
+$mobTabChat.addEventListener('click', function () { setMobTab('chat'); });
+
+// Show notification dot when AI sends a message while on Read tab
+function mobChatNotify() {
+  if (_mobActive !== 'chat') $mobChatDot.classList.add('show');
+}
+
+// Patch appendMessage to fire notify when AI responds
+var _origAppendMessage = appendMessage;
+appendMessage = function (role, text, opts) {
+  var el = _origAppendMessage(role, text, opts);
+  if (role === 'ai') mobChatNotify();
+  return el;
+};
+
+// Auto-switch to chat tab on mobile when character phase begins
+var _origUpdateChatPanel = updateChatPanel;
+updateChatPanel = function () {
+  _origUpdateChatPanel();
+  if (state.phase === 'character' && window.innerWidth <= 700) {
+    setTimeout(function () { setMobTab('chat'); }, 600);
+  }
+};
 
 })();
 </script>

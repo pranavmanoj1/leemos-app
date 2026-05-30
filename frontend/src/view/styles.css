@@ -585,24 +585,127 @@ html.dark #prose p.cite-flash {
 #toc-list li button:hover   { background: color-mix(in srgb, var(--ink) 7%, var(--bg)); }
 #toc-list li button.current { background: var(--ink); color: var(--bg); }
 
+/* ── MOBILE TAB BAR (hidden on desktop) ── */
+#mobile-tabs { display: none; }
+
 /* ── MOBILE ── */
 @media (max-width: 700px) {
-  #interface { flex-direction: column; }
 
-  #reading-col { height: 55vh; flex: none; }
-
-  #chat-panel {
-    width: 100%;
-    flex: 1;
-    border-left: none;
+  /* Tab bar */
+  #mobile-tabs {
+    display: flex;
+    position: fixed;
+    bottom: 0; left: 0; right: 0;
+    height: calc(52px + env(safe-area-inset-bottom, 0px));
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    background: var(--bg);
     border-top: 1px solid var(--border);
+    z-index: 80;
+  }
+  .mob-tab {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    border: none;
+    background: none;
+    color: var(--ink);
+    opacity: 0.38;
+    font-family: system-ui, -apple-system, sans-serif;
+    font-size: 10px;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    transition: opacity 0.15s;
+    position: relative;
+    padding: 6px 0 4px;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .mob-tab.active { opacity: 1; }
+
+  /* Notification dot on chat tab */
+  #mob-chat-dot {
+    display: none;
+    position: absolute;
+    top: 6px; right: calc(50% - 14px);
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: var(--char-accent);
+  }
+  #mob-chat-dot.show { display: block; }
+
+  /* Interface: full height minus tab bar */
+  #interface {
+    flex-direction: row;
+    height: calc(100vh - 52px - env(safe-area-inset-bottom, 0px));
+    position: relative;
+    overflow: hidden;
   }
 
-  #prose-scroll { padding: 28px 18px 60px; }
+  /* Both panels sit full-screen; one is hidden at a time */
+  #reading-col {
+    position: absolute; inset: 0;
+    width: 100%; height: 100%;
+    flex: none;
+    display: flex;
+    flex-direction: column;
+    transition: transform 0.28s cubic-bezier(0.4,0,0.2,1);
+    will-change: transform;
+  }
+  #chat-panel {
+    position: absolute; inset: 0;
+    width: 100%; height: 100%;
+    border-left: none;
+    border-top: none;
+    display: flex;
+    flex-direction: column;
+    transform: translateX(100%);
+    transition: transform 0.28s cubic-bezier(0.4,0,0.2,1);
+    will-change: transform;
+  }
 
-  #prose-inner article p { font-size: 17px; }
+  /* Active tab slides in; inactive slides out */
+  body.mob-chat #reading-col { transform: translateX(-100%); }
+  body.mob-chat #chat-panel  { transform: translateX(0); }
+
+  /* Prose adjustments */
+  #prose-scroll {
+    padding: 28px 20px env(safe-area-inset-bottom, 80px);
+    padding-bottom: max(80px, env(safe-area-inset-bottom, 0px));
+  }
+  #prose-inner article p { font-size: 17px; line-height: 1.70; }
+  #chapter-header { padding: 12px 16px 10px; }
+
+  /* Reveal footer: full-width button */
+  #reveal-footer {
+    padding: 12px 16px calc(12px + env(safe-area-inset-bottom, 0px));
+    flex-wrap: wrap;
+    justify-content: space-between;
+  }
+  #btn-reveal, #btn-end-chapter, #btn-next-chapter {
+    flex: 1;
+    min-height: 44px;
+  }
+
+  /* Toolbar: touch-friendly */
+  .tool-btn { padding: 8px 10px; min-height: 36px; }
+
+  /* Selection toolbar: bigger tap targets */
+  #sel-toolbar button { padding: 10px 20px; font-size: 12px; }
+
+  /* Annotation popover: full-width on small screens */
+  #ann-popover.active { width: calc(100vw - 32px); left: 16px !important; }
+
+  /* Chat input: prevent iOS zoom (font >= 16px) */
+  #chat-input { font-size: 16px; }
+  #btn-send { width: 40px; height: 40px; }
+
+  /* TOC: full width on mobile */
+  #toc-panel { width: min(320px, 90vw); }
 }
 
-@media (max-width: 480px) {
-  #chapter-header { padding: 12px 16px 10px; }
+@media (max-width: 380px) {
+  #prose-inner article p { font-size: 16px; }
+  .tool-btn span { display: none; } /* hide "Contents" text, keep icon */
 }
