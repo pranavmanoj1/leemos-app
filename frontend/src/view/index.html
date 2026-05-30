@@ -511,7 +511,7 @@ function appendMessage(role, text, opts) {
 
 // ─── Streaming SSE helper ─────────────────────────────────────────────────────
 
-function streamChat(endpoint, body, onDelta, onDone, onError) {
+function streamChat(endpoint, body, onDelta, onDone, onError, onCite) {
   fetch(API_BASE + endpoint, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -531,9 +531,10 @@ function streamChat(endpoint, body, onDelta, onDone, onError) {
           if (!line.startsWith('data: ')) return;
           try {
             var evt = JSON.parse(line.slice(6));
-            if (evt.delta)    onDelta(evt.delta);
-            if (evt.done)     onDone();
-            if (evt.error)    onError('AI went quiet.');
+            if (evt.cite  && onCite)  onCite(evt.cite);
+            if (evt.delta)            onDelta(evt.delta);
+            if (evt.done)             onDone();
+            if (evt.error)            onError('AI went quiet.');
           } catch (e) {}
         });
         pump();
@@ -541,6 +542,32 @@ function streamChat(endpoint, body, onDelta, onDone, onError) {
     }
     pump();
   }).catch(function (e) { onError(String(e)); });
+}
+
+// ── Flash a narrator.json quote in the prose ──────────────────────────────────
+function flashQuoteInProse(quoteText) {
+  if (!quoteText) return;
+  var paras = $prose.querySelectorAll('p[data-para]');
+  var needle = quoteText.replace(/\u2019/g, "'").replace(/\u2018/g, "'")
+                        .replace(/\u201c/g, '"').replace(/\u201d/g, '"')
+                        .replace(/\s+/g, ' ').trim();
+
+  // Try progressively shorter prefixes until we find a match
+  var found = null;
+  var lengths = [needle.length, Math.floor(needle.length * 0.7), Math.floor(needle.length * 0.4), 30];
+  for (var li = 0; li < lengths.length && !found; li++) {
+    var sub = needle.slice(0, lengths[li]);
+    if (sub.length < 12) break;
+    for (var i = 0; i < paras.length; i++) {
+      var pText = (paras[i].textContent || '').replace(/\s+/g, ' ');
+      if (pText.indexOf(sub) !== -1) { found = paras[i]; break; }
+    }
+  }
+  if (!found) return;
+
+  found.classList.add('cite-flash');
+  found.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  setTimeout(function () { found.classList.remove('cite-flash'); }, 3800);
 }
 
 // ─── Send companion message ───────────────────────────────────────────────────
@@ -637,7 +664,8 @@ function sendCharacter(userText) {
       bubble.classList.remove('streaming');
       state.aiTyping    = false;
       $btnSend.disabled = false;
-    }
+    },
+    function (cite) { flashQuoteInProse(cite); }
   );
 }
 
@@ -738,7 +766,8 @@ function triggerCharacterGreeting() {
       bubble.classList.remove('streaming');
       state.aiTyping    = false;
       $btnSend.disabled = false;
-    }
+    },
+    function (cite) { flashQuoteInProse(cite); }
   );
 }
 

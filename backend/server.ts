@@ -1,4 +1,5 @@
 import * as path from 'path';
+import * as fs from 'fs';
 import * as dotenv from 'dotenv';
 import express, { type Request, type Response } from 'express';
 import postgres from 'postgres';
@@ -27,6 +28,72 @@ const openai = new OpenAI({
     apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
     baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
 });
+
+// ── Narrator data (quotes per chapter) ────────────────────────────────────────
+
+interface NarratorQuote { text: string; confidence: number; category: string; }
+
+const _narratorChapters: NarratorQuote[][] = (() => {
+    try {
+        const raw = fs.readFileSync(
+            path.resolve(__dirname, 'db/data/notes-from-the-undergound/narrator.json'),
+            'utf-8'
+        );
+        const data = JSON.parse(raw);
+        const chapters: any[] = data.chapters ?? [];
+        const real = chapters
+            .filter((ch: any) => !String(ch.note ?? '').includes('skipped'))
+            .sort((a: any, b: any) => (a.start_offset ?? 0) - (b.start_offset ?? 0));
+
+        return real.map((ch: any) => {
+            const obs = ch.observations ?? {};
+            const quotes: NarratorQuote[] = [];
+            for (const [cat, items] of Object.entries(obs)) {
+                if (!Array.isArray(items)) continue;
+                for (const item of items as any[]) {
+                    if (typeof item?.quote === 'string' && item.quote.trim() && (item.confidence ?? 0) >= 0.85) {
+                        quotes.push({ text: item.quote.trim(), confidence: item.confidence, category: cat });
+                    }
+                }
+            }
+            return quotes;
+        });
+    } catch (e) {
+        console.warn('narrator.json load failed:', e);
+        return [];
+    }
+})();
+
+function pickCiteQuote(chapterNum: number, userMessage: string, greeting: boolean): string | null {
+    const idx = chapterNum - 1;
+    if (idx < 0 || idx >= _narratorChapters.length) return null;
+    const quotes: NarratorQuote[] = _narratorChapters[idx] ?? [];
+    if (!quotes.length) return null;
+
+    if (greeting) {
+        const order = ['arc', 'key_events', 'personality_traits', 'motivations', 'flaws'];
+        for (const cat of order) {
+            const found = quotes
+                .filter(q => q.category === cat)
+                .sort((a, b) => b.confidence - a.confidence);
+            const first = found[0];
+            if (first) return first.text;
+        }
+        const top = [...quotes].sort((a, b) => b.confidence - a.confidence)[0];
+        return top ? top.text : null;
+    }
+
+    // keyword overlap scoring
+    const words = userMessage.toLowerCase().split(/\W+/).filter(w => w.length > 3);
+    let best: NarratorQuote | null = quotes[0] ?? null;
+    let bestScore = -1;
+    for (const q of quotes) {
+        const ql = q.text.toLowerCase();
+        const score = words.reduce((s, w) => s + (ql.includes(w) ? 1 : 0), 0) + q.confidence * 0.5;
+        if (score > bestScore) { bestScore = score; best = q; }
+    }
+    return best ? best.text : null;
+}
 
 const app = express();
 app.use(express.json({ limit: '2mb' }));
@@ -238,6 +305,12 @@ Respond as the Underground Man: in his voice, with his tics and contradictions. 
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache');
     res.setHeader('Connection', 'keep-alive');
+
+    // Emit a cite quote before the AI stream starts
+    const cite = pickCiteQuote(chapterNum, userMessage ?? '', greeting ?? false);
+    if (cite) {
+        res.write(`data: ${JSON.stringify({ cite })}\n\n`);
+    }
 
     const actualUserMessage = greeting
         ? `__GREETING__`

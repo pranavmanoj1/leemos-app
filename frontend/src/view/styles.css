@@ -214,6 +214,25 @@ html.dark mark.hl-noted  { border-bottom-color: rgba(200, 169, 120, 0.55); }
 html.sepia mark.hl       { background: rgba(140, 90, 20, 0.26); }
 html.sepia mark.hl:hover { background: rgba(140, 90, 20, 0.40); }
 
+/* ── CITE FLASH (character quote highlight) ── */
+@keyframes cite-pulse {
+  0%   { background: transparent; box-shadow: none; }
+  15%  { background: rgba(160, 110, 30, 0.18); box-shadow: inset 3px 0 0 rgba(160, 110, 30, 0.7); }
+  60%  { background: rgba(160, 110, 30, 0.14); box-shadow: inset 3px 0 0 rgba(160, 110, 30, 0.55); }
+  100% { background: transparent; box-shadow: none; }
+}
+#prose p.cite-flash {
+  animation: cite-pulse 3.8s ease forwards;
+  border-radius: 2px;
+  transition: background 0.3s;
+}
+html.dark #prose p.cite-flash {
+  animation: none;
+  background: rgba(200, 169, 120, 0.14);
+  box-shadow: inset 3px 0 0 rgba(200, 169, 120, 0.6);
+  transition: background 3.8s ease, box-shadow 3.8s ease;
+}
+
 /* ── SELECTION TOOLBAR ── */
 #sel-toolbar        { display: none; }
 #sel-toolbar.active {
