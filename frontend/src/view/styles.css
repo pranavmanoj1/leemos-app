@@ -182,15 +182,16 @@ html, body {
 /* ── PROSE TEXT SELECTION ── */
 #prose p::selection,
 #prose mark::selection {
-  background: rgba(160, 110, 40, 0.10);
-  text-decoration: underline;
-  text-decoration-color: rgba(160, 110, 40, 0.65);
-  text-underline-offset: 2px;
+  background: rgba(160, 110, 40, 0.08);
+  text-decoration: underline dotted;
+  text-decoration-color: rgba(160, 110, 40, 0.75);
+  text-underline-offset: 3px;
 }
 html.dark #prose p::selection,
 html.dark #prose mark::selection {
-  background: rgba(200, 169, 120, 0.10);
-  text-decoration-color: rgba(200, 169, 120, 0.6);
+  background: rgba(200, 169, 120, 0.08);
+  text-decoration: underline dotted;
+  text-decoration-color: rgba(200, 169, 120, 0.7);
 }
 
 /* ── HIGHLIGHTS ── */

@@ -321,6 +321,7 @@ function startChapter(idx, resetChat) {
 
 function saveProgress() {
   localStorage.setItem('leemos-ch', String(state.chapterIndex));
+  localStorage.setItem('leemos-rev-' + state.chapterIndex, String(state.revealedCount));
 }
 
 // ─── Prose rendering ──────────────────────────────────────────────────────────
@@ -392,6 +393,7 @@ function revealNext() {
   if (state.revealedCount >= ch.paragraphs.length) return;
 
   state.revealedCount++;
+  saveProgress();
   state.streaming = true;
 
   // Keep previous paragraphs; just append the new one
@@ -1044,6 +1046,13 @@ loadBook()
   .then(function () {
     if (state.chapterIndex >= BOOK.chapters.length) state.chapterIndex = 0;
     startChapter(state.chapterIndex, true);
+    // Restore how far the reader had revealed in this chapter
+    var savedRev = parseInt(localStorage.getItem('leemos-rev-' + state.chapterIndex) || '1', 10);
+    var maxPara  = currentChapter().paragraphs.length;
+    if (savedRev > 1 && savedRev <= maxPara) {
+      state.revealedCount = savedRev;
+      renderChapter();
+    }
   })
   .catch(function (err) {
     console.error('Failed to load book:', err);
