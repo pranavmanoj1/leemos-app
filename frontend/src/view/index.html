@@ -861,24 +861,26 @@ document.querySelectorAll('[data-theme]').forEach(function (btn) {
 var _pendingAnn = null; // { paraEl, paraIndex, start, end }
 var _editingAnn = null; // { ann } or { pending }
 
-function hideSelToolbar() {
-  $selToolbar.hidden = true;
-  _pendingAnn = null;
-}
+function showSelToolbar() { $selToolbar.classList.add('active'); }
+function hideSelToolbar() { $selToolbar.classList.remove('active'); _pendingAnn = null; }
+function showAnnPopover_el() { $annPopover.classList.add('active'); }
+function hideAnnPopover() { $annPopover.classList.remove('active'); _editingAnn = null; }
 
 function positionNear(el, refRect) {
-  var h = el.offsetHeight || 80;
+  // Must be visible to measure offsetHeight
+  var h = el.offsetHeight || 36;
   var top = refRect.top - h - 10;
   if (top < 8) top = refRect.bottom + 8;
-  var left = Math.max(8, Math.min(refRect.left + refRect.width / 2 - el.offsetWidth / 2, window.innerWidth - (el.offsetWidth || 200) - 8));
+  var w = el.offsetWidth || 160;
+  var left = Math.max(8, Math.min(refRect.left + refRect.width / 2 - w / 2, window.innerWidth - w - 8));
   el.style.top  = top + 'px';
   el.style.left = left + 'px';
 }
 
-// Show the toolbar above the selected text
+// Show toolbar above selected prose text
 $prose.addEventListener('mouseup', function () {
   if (state.streaming) return;
-  setTimeout(function () {              // wait for selection to settle
+  setTimeout(function () {
     var sel = window.getSelection();
     if (!sel || sel.isCollapsed || !sel.rangeCount) { hideSelToolbar(); return; }
     var range = sel.getRangeAt(0);
@@ -890,18 +892,15 @@ $prose.addEventListener('mouseup', function () {
     if (end <= start) { hideSelToolbar(); return; }
     _pendingAnn = { paraEl: startPara, paraIndex: parseInt(startPara.dataset.para), start: start, end: end };
     var rect = range.getBoundingClientRect();
-    $selToolbar.hidden = false;
+    showSelToolbar();
     positionNear($selToolbar, rect);
   }, 10);
 });
 
-// Hide toolbar when clicking outside
+// Dismiss on outside click
 document.addEventListener('mousedown', function (e) {
-  if (!$selToolbar.hidden && !$selToolbar.contains(e.target)) hideSelToolbar();
-  if (!$annPopover.hidden && !$annPopover.contains(e.target) && !e.target.closest('mark')) {
-    $annPopover.hidden = true;
-    _editingAnn = null;
-  }
+  if ($selToolbar.classList.contains('active') && !$selToolbar.contains(e.target)) hideSelToolbar();
+  if ($annPopover.classList.contains('active') && !$annPopover.contains(e.target) && !e.target.closest('mark[data-ann]')) hideAnnPopover();
 });
 
 function commitHighlight(note) {
@@ -923,35 +922,32 @@ function commitHighlight(note) {
 
 function showAnnPopover(ann, refRect) {
   _editingAnn = { ann: ann };
-  $annTextarea.value  = ann ? ann.note : '';
-  $annBtnDelete.hidden = !ann;
-  $annPopover.hidden  = false;
+  $annTextarea.value   = ann ? ann.note : '';
+  $annBtnDelete.style.display = ann ? '' : 'none';
+  showAnnPopover_el();
   positionNear($annPopover, refRect);
   $annTextarea.focus();
 }
 
-$selBtnHL.addEventListener('click', function () {
-  $selToolbar.hidden = true; // hide immediately before DOM work
-  var saved = _pendingAnn;
-  _pendingAnn = null;
-  if (saved) {
-    _pendingAnn = saved;
-    commitHighlight('');
-  }
+// Highlight button — use mousedown so click doesn't re-trigger selection mouseup
+$selBtnHL.addEventListener('mousedown', function (e) {
+  e.preventDefault();             // keep text selection alive through the click
+  hideSelToolbar();               // hide immediately
+  commitHighlight('');
 });
 
-$selBtnAnn.addEventListener('click', function () {
+$selBtnAnn.addEventListener('mousedown', function (e) {
+  e.preventDefault();
   if (!_pendingAnn) return;
   var pending = _pendingAnn;
   hideSelToolbar();
   window.getSelection().removeAllRanges();
-  _pendingAnn = pending;       // restore so commitHighlight can use it
-  // Get a rect near the selection
+  _pendingAnn = pending;
   var rect = pending.paraEl.getBoundingClientRect();
   _editingAnn = { pending: pending };
-  $annTextarea.value   = '';
-  $annBtnDelete.hidden = true;
-  $annPopover.hidden   = false;
+  $annTextarea.value  = '';
+  $annBtnDelete.style.display = 'none';
+  showAnnPopover_el();
   positionNear($annPopover, rect);
   $annTextarea.focus();
 });
@@ -962,13 +958,11 @@ $annBtnSave.addEventListener('click', function () {
     commitHighlight(note);
   } else if (_editingAnn && _editingAnn.ann) {
     _editingAnn.ann.note = note;
-    if (!note) _editingAnn.ann.note = '';
     saveAnnotations();
     var paraEl = $prose.querySelector('p[data-para="' + _editingAnn.ann.paraIndex + '"]');
     if (paraEl) rerenderPara(paraEl, _editingAnn.ann.paraIndex);
   }
-  $annPopover.hidden = true;
-  _editingAnn = null;
+  hideAnnPopover();
 });
 
 $annBtnDelete.addEventListener('click', function () {
@@ -977,13 +971,11 @@ $annBtnDelete.addEventListener('click', function () {
   saveAnnotations();
   var paraEl = $prose.querySelector('p[data-para="' + _editingAnn.ann.paraIndex + '"]');
   if (paraEl) rerenderPara(paraEl, _editingAnn.ann.paraIndex);
-  $annPopover.hidden = true;
-  _editingAnn = null;
+  hideAnnPopover();
 });
 
 $annBtnCancel.addEventListener('click', function () {
-  $annPopover.hidden = true;
-  _editingAnn = null;
+  hideAnnPopover();
   _pendingAnn = null;
 });
 

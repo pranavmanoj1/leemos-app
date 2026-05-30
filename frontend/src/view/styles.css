@@ -215,7 +215,8 @@ html.sepia mark.hl       { background: rgba(140, 90, 20, 0.26); }
 html.sepia mark.hl:hover { background: rgba(140, 90, 20, 0.40); }
 
 /* ── SELECTION TOOLBAR ── */
-#sel-toolbar {
+#sel-toolbar        { display: none; }
+#sel-toolbar.active {
   position: fixed;
   z-index: 300;
   display: flex;
@@ -243,7 +244,9 @@ html.sepia mark.hl:hover { background: rgba(140, 90, 20, 0.40); }
 #sel-toolbar button:hover { opacity: 1; background: var(--panel-bg); }
 
 /* ── ANNOTATION POPOVER ── */
-#ann-popover {
+#ann-popover        { display: none; }
+#ann-popover.active {
+  display: block;
   position: fixed;
   z-index: 300;
   width: 220px;
