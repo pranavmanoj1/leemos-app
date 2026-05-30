@@ -963,7 +963,9 @@ function showAnnPopover(ann, refRect) {
 // Highlight button — use mousedown so click doesn't re-trigger selection mouseup
 $selBtnHL.addEventListener('mousedown', function (e) {
   e.preventDefault();             // keep text selection alive through the click
-  hideSelToolbar();               // hide immediately
+  var pending = _pendingAnn;      // save before hideSelToolbar clears it
+  hideSelToolbar();
+  _pendingAnn = pending;          // restore so commitHighlight can use it
   commitHighlight('');
 });
 
