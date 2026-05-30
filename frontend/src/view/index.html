@@ -50,8 +50,6 @@
 
         <div class="tool-sep"></div>
 
-        <button class="tool-btn" id="btn-font-minus" title="Smaller text">A−</button>
-        <button class="tool-btn" id="btn-font-plus"  title="Larger text">A+</button>
         <button class="tool-btn" id="btn-font-toggle" title="Toggle font"></button>
 
         <div class="tool-sep"></div>
@@ -241,8 +239,6 @@ var $tocPanel     = document.getElementById('toc-panel');
 var $tocList      = document.getElementById('toc-list');
 var $tocClose     = document.getElementById('toc-close');
 var $btnToc       = document.getElementById('btn-toc');
-var $btnFontMinus = document.getElementById('btn-font-minus');
-var $btnFontPlus  = document.getElementById('btn-font-plus');
 var $btnFontToggle= document.getElementById('btn-font-toggle');
 var $selToolbar   = document.getElementById('sel-toolbar');
 var $selBtnHL     = document.getElementById('sel-btn-highlight');
@@ -868,14 +864,6 @@ $btnToc.addEventListener('click', openTOC);
 $tocClose.addEventListener('click', closeTOC);
 $tocBackdrop.addEventListener('click', closeTOC);
 
-$btnFontMinus.addEventListener('click', function () {
-  state.fontSize = Math.max(FONT_MIN, state.fontSize - 1);
-  applyFont();
-});
-$btnFontPlus.addEventListener('click', function () {
-  state.fontSize = Math.min(FONT_MAX, state.fontSize + 1);
-  applyFont();
-});
 $btnFontToggle.addEventListener('click', function () {
   state.fontFamily = state.fontFamily === 'serif' ? 'sans' : 'serif';
   applyFont();
