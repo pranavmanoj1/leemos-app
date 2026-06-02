@@ -24,10 +24,19 @@ if (!databaseUrl) {
 const client = postgres(databaseUrl, { prepare: false });
 const db = drizzle(client, { schema: { books, chapters } });
 
-const openai = new OpenAI({
-    apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
-    baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
-});
+const openaiApiKey = process.env.AI_INTEGRATIONS_OPENAI_API_KEY;
+const openai = openaiApiKey
+    ? new OpenAI({
+          apiKey: openaiApiKey,
+          baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
+      })
+    : null;
+
+if (!openai) {
+    console.warn(
+        'AI_INTEGRATIONS_OPENAI_API_KEY is not set — AI endpoints (/api/companion, /api/stance, /api/character) are disabled.',
+    );
+}
 
 // ── Narrator data (quotes per chapter) ────────────────────────────────────────
 
@@ -173,6 +182,11 @@ app.post('/api/companion', async (req: Request, res: Response) => {
         return;
     }
 
+    if (!openai) {
+        res.status(503).json({ error: 'AI is not configured on this server' });
+        return;
+    }
+
     const systemPrompt = `You are a thoughtful literary companion reading "Notes from the Underground" by Fyodor Dostoyevsky alongside the reader. You share the reader's knowledge boundary: you know ONLY what has been revealed in the passage below — nothing beyond it.
 
 Your role: be an engaged reading partner. Notice what's striking, speculate carefully, ask questions, make connections, react as a smart reader would — with curiosity and genuine literary attention.
@@ -235,7 +249,7 @@ app.post('/api/stance', async (req: Request, res: Response) => {
         companionMessages: { role: string; content: string }[];
     };
 
-    if (!companionMessages || companionMessages.length === 0) {
+    if (!companionMessages || companionMessages.length === 0 || !openai) {
         res.json({ stance: '' });
         return;
     }
@@ -282,6 +296,11 @@ app.post('/api/character', async (req: Request, res: Response) => {
         companionStance: string;
         greeting?: boolean;
     };
+
+    if (!openai) {
+        res.status(503).json({ error: 'AI is not configured on this server' });
+        return;
+    }
 
     const stanceSection = companionStance
         ? `The reader discussed this chapter with a companion before meeting you. Their companion noted: "${companionStance}"\n\nYou arrive knowing the reader's posture. Let it color your opening — but don't announce that you know it.`
@@ -356,12 +375,13 @@ Respond as the Underground Man: in his voice, with his tics and contradictions. 
     }
 });
 
-// ── Static ────────────────────────────────────────────────────────────────────
+// ── Server ────────────────────────────────────────────────────────────────────
+// API only. The frontend is a separate Vite app (see frontend/): in dev it runs
+// on its own port and proxies /api here; in prod it is built to frontend/dist
+// and served as static assets independently.
 
-const viewDir = path.resolve(__dirname, '..', 'frontend', 'src', 'view');
-app.use(express.static(viewDir));
-
-const port = Number(process.env.PORT) || 5000;
+// Default to 5001: macOS (Monterey+) AirPlay Receiver squats on port 5000.
+const port = Number(process.env.PORT) || 5001;
 app.listen(port, '0.0.0.0', () => {
     console.log(`Server listening on http://0.0.0.0:${port}`);
 });

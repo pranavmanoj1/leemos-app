@@ -1,20 +1,15 @@
 {
-  "name": "leemos-app",
+  "name": "leemos-backend",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
-  "scripts": {
-    "dev": "nodemon --exec ts-node src/index.ts",
-    "dev:server": "nodemon --watch backend --ext ts --exec \"ts-node --project backend/tsconfig.json backend/server.ts\"",
-    "start:server": "ts-node --project backend/tsconfig.json backend/server.ts",
-    "build": "tsc",
-    "start": "node dist/index.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
-  },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
+  "description": "Leemos API server (Express + Drizzle + OpenAI).",
+  "private": true,
   "type": "commonjs",
+  "scripts": {
+    "dev": "nodemon --watch . --ext ts --exec \"ts-node --project tsconfig.json server.ts\"",
+    "start": "ts-node --project tsconfig.json server.ts",
+    "db:push": "ts-node db/push.ts",
+    "db:enter": "ts-node db/enter.ts"
+  },
   "dependencies": {
     "drizzle-orm": "^0.45.2",
     "drizzle-zod": "^0.8.3",
