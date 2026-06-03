@@ -1,4 +1,7 @@
 import { signInWithGoogle } from '../controller/auth.controller'
+// Resolve the stylesheet through Vite so it points at the hashed asset in prod
+// (a hard-coded '/src/styles/styles.css' only exists under the dev server).
+import styleUrl from '../styles/styles.css?url'
 
 export class authBox extends HTMLElement {
   constructor() {
@@ -12,7 +15,7 @@ export class authBox extends HTMLElement {
     if (template && template instanceof HTMLTemplateElement) {
       const link = document.createElement('link')
       link.rel = 'stylesheet'
-      link.href = '/src/styles/styles.css'
+      link.href = styleUrl
 
       const clone = template.content.cloneNode(true)
       if (this.shadowRoot) {

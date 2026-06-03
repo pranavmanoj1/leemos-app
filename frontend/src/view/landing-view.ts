@@ -47,7 +47,7 @@ export interface Author {
   
   export const HARDCODED_AUTHORS: Author[] = [
     {
-      image: "images/dostoevsky.png",
+      image: "/images/dostoevsky.png",
       line: "Beauty will save the world.",
       gamma: 1.30,
       fit: 0.96,
