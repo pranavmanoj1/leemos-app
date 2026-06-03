@@ -88,6 +88,13 @@ html, body {
   gap: 12px;
 }
 
+#chapter-header-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
 #chapter-label {
   font-size: 11px;
   letter-spacing: 0.10em;
@@ -380,7 +387,19 @@ html.dark #prose p.cite-flash {
   border-left: 1px solid var(--border);
   background: var(--panel-bg);
   overflow: hidden;
-  transition: background 0.4s;
+  transition: background 0.4s, width 0.3s cubic-bezier(0.4,0,0.2,1);
+}
+
+/* Desktop: collapse the companion panel via the toolbar toggle */
+@media (min-width: 701px) {
+  #interface.chat-collapsed #chat-panel {
+    width: 0;
+    border-left: none;
+  }
+}
+
+#btn-chat-toggle.active {
+  color: var(--char-accent);
 }
 
 #chat-header {
@@ -690,6 +709,9 @@ html.dark #prose p.cite-flash {
 
   /* Toolbar: touch-friendly */
   .tool-btn { padding: 8px 10px; min-height: 36px; }
+
+  /* Desktop companion toggle is replaced by the bottom chat tab on mobile */
+  #btn-chat-toggle, #toolbar-strip .tool-sep:last-of-type { display: none; }
 
   /* Selection toolbar: bigger tap targets */
   #sel-toolbar button { padding: 10px 20px; font-size: 12px; }

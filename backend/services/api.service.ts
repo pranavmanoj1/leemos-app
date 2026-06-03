@@ -81,6 +81,16 @@ export function createApiApp(): Express {
         }
     });
 
+    app.get('/api/books', async (req, res) => {
+        try {
+            const items = await db.select().from(books);
+            res.json(items);
+        } catch (error) {
+            res.status(500).json({ error: '/api/books request failed' });
+        }
+    });
+    
+
     // API only. The frontend is served separately by Vite (see frontend/).
     return app;
 }

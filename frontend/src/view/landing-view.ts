@@ -1,11 +1,5 @@
 // in-their-own-words.ts
-// Web component: word-portrait with novel-text rain background.
-//
-// Build:  npm run build
-// Usage:  import "./in-their-own-words.js";
-//         <in-their-own-words></in-their-own-words>
-
-// ── Public types ─────────────────────────────────────────────────────────────
+// 
 
 /** Source data for one word-portrait. Glyphs from `text` become the ink. */
 export interface Author {

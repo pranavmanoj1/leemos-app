@@ -118,6 +118,16 @@ app.options('/{*path}', (_req, res) => { res.sendStatus(204); });
 
 // ── Book API ─────────────────────────────────────────────────────────────────
 
+app.get('/api/books', async (_req: Request, res: Response) => {
+    try {
+        const rows = await db.select({ id: books.id, title: books.title, author: books.author }).from(books).orderBy(asc(books.id));
+        res.json(rows);
+    } catch (err) {
+        console.error('GET /api/books failed:', err);
+        res.status(500).json({ error: 'server error' });
+    }
+});
+
 app.get('/api/books/:id', async (req: Request, res: Response) => {
     const raw = Number(req.params.id);
     if (!Number.isFinite(raw)) {
