@@ -8,7 +8,7 @@ import type {
     BookId,
     Chapter,
     ChapterId,
-} from '../../frontend/src/model/book';
+} from '../model/book';
 
 // Build the wired Express API: DB client, JSON + CORS middleware, and the book
 // API. Kept as a factory (rather than top-level side effects) so the entry

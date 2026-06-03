@@ -19,6 +19,6 @@
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true
   },
-  "include": ["**/*.ts", "../frontend/src/model/**/*.ts"],
+  "include": ["**/*.ts"],
   "exclude": ["node_modules", "dist", "drizzle"]
 }

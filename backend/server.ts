@@ -12,7 +12,7 @@ import type {
     BookId,
     Chapter,
     ChapterId,
-} from '../frontend/src/model/book';
+} from './model/book';
 
 dotenv.config({ path: path.resolve(__dirname, '.env') });
 
