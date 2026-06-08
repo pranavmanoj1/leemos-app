@@ -750,7 +750,7 @@ function auditExplanation(score, comp, d, A, quote){
     ? ' Sentence position contributed nothing, the largest unused part of the ranking score.' : '';
   const scorePct=Math.max(0,Math.min(100,(+score||0)*100));
   const rows=['<p class="math-lead"><b>'+esc(headline)+'</b></p>'+
-    '<p class="math-sub">A sentence is highlighted when one signal is strong enough by itself. Priority only decides the order of highlighted sentences.'+positionNote+'</p>',
+    '<p class="math-sub">A sentence is highlighted when one signal is strong enough by itself. The highlight rule decides whether a sentence is marked at all; priority only ranks sentences that are already highlighted.'+positionNote+'</p>',
     '<div class="math-sec"><div class="math-h">Priority: '+score+' of 1.000</div>'+
       '<div class="math-track"><span class="math-seg" style="width:'+scorePct+'%;background:#8b5e34"></span></div>'+
       '<div class="math-scale"><span>0.000</span><span>'+score+'</span><span>1.000</span></div></div>',
