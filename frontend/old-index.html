@@ -377,7 +377,7 @@ function select(el,id){
     renderWordThreads(P, rec, concepts, 2);
     renderLocalPatterns(P, quote, rhet, concepts);
     renderRelated(P, related);
-    renderAudit(P, sal, comp, d, A);
+    renderAudit(P, sal, comp, d, A, quote);
     P.scrollTop=0;
   });
 }
@@ -698,15 +698,15 @@ function topThreads(list, concepts, n){
   }).sort((a,b)=>b.score-a.score).slice(0,n);
 }
 
-function renderAudit(P, sal, comp, d, A){
+function renderAudit(P, sal, comp, d, A, quote){
   const det=document.createElement('details');det.className='raw';
   const score=sal.score!=null?sal.score.toFixed(3):'?';
   det.innerHTML='<summary>Show the math</summary>'+
-    '<div class="explain">'+auditExplanation(score, comp, d, A)+'</div>';
+    '<div class="explain">'+auditExplanation(score, comp, d, A, quote)+'</div>';
   P.appendChild(det);
 }
 
-function auditExplanation(score, comp, d, A){
+function auditExplanation(score, comp, d, A, quote){
   const keyness=+comp.keyness||0;
   const burstiness=+comp.burstiness||0;
   const links=+comp.centrality||0;
@@ -717,17 +717,17 @@ function auditExplanation(score, comp, d, A){
   const centralityContribution=Math.min(.15,(+comp.centrality||0)/8*.15);
   const signals=[
     {name:'Distinctive wording',raw:keyness,rawDisplay:keyness.toFixed(1),floor:120,
-      contribution:keynessContribution,max:.40,color:'#8b5e34',
-      note:'Can add many ranking points before it reaches the highlight gate.'},
+      contribution:keynessContribution,max:.40,rankCap:'60',color:'#8b5e34',
+      note:'Keyness '+keyness.toFixed(1)+' can still give the full priority boost, but it needs 120 to highlight the sentence by itself.'},
     {name:'Concentrated wording',raw:burstiness,rawDisplay:burstiness.toFixed(3),floor:.70,
-      contribution:burstContribution,max:.25,color:'#c28a52',
-      note:'Measures whether a notable word clusters in this part of the book.'},
+      contribution:burstContribution,max:.25,rankCap:'1.000',color:'#c28a52',
+      note:'More clustering raises priority. At 0.70, this signal can highlight the sentence by itself.'},
     {name:'Sentence position',raw:structural?1:0,rawDisplay:structural?'marked':'not marked',floor:null,
-      contribution:structuralContribution,max:.20,color:'#7b8b6f',
+      contribution:structuralContribution,max:.20,rankCap:'when marked',color:'#7b8b6f',
       note:'All-or-nothing: 0.200 for a structural position, otherwise 0.000.'},
     {name:'Weighted sentence links',raw:links,rawDisplay:String(links),floor:5,
-      contribution:centralityContribution,max:.15,color:'#b56f45',
-      note:'Counts weighted links to other sentences; not the same as visible evidence cards.'}
+      contribution:centralityContribution,max:.15,rankCap:'8',color:'#b56f45',
+      note:'At 5, links can highlight the sentence by themselves. The priority boost keeps growing until 8.'}
   ];
   signals.forEach(s=>{
     s.hasGate=s.floor!=null;
@@ -739,24 +739,24 @@ function auditExplanation(score, comp, d, A){
   const strongest=rankedSignals[0];
   const passedNames=passed.map(s=>s.name.toLowerCase());
   let headline=passed.length
-    ? 'Highlighted by '+naturalList(passedNames)+'.'
-    : 'No gate qualified this sentence.';
+    ? 'Highlighted because '+naturalList(passedNames)+' was strong enough by itself.'
+    : 'No single signal was strong enough to highlight this sentence.';
   if(passed.length && strongest && !strongest.passed)
-    headline+=' Its rank comes mostly from '+strongest.name.toLowerCase()+', which did not open the gate.';
+    headline+=' It ranks high mostly because of '+strongest.name.toLowerCase()+', which helped priority but was not enough by itself.';
   const exactPass=passed.find(s=>s.raw===s.floor);
-  if(exactPass)headline+=' '+exactPass.name+' cleared its gate exactly.';
+  if(exactPass)headline+=' '+exactPass.name+' hit the highlight line exactly.';
   const gaps=signals.map(s=>({name:s.name,gap:s.max-s.contribution})).sort((a,b)=>b.gap-a.gap);
   const positionNote=!structural && gaps[0].name==='Sentence position'
     ? ' Sentence position contributed nothing, the largest unused part of the ranking score.' : '';
   const scorePct=Math.max(0,Math.min(100,(+score||0)*100));
   const rows=['<p class="math-lead"><b>'+esc(headline)+'</b></p>'+
-    '<p class="math-sub">Passing any one gate earns a highlight. The priority score only orders highlighted sentences.'+positionNote+'</p>',
+    '<p class="math-sub">A sentence is highlighted when one signal is strong enough by itself. Priority only decides the order of highlighted sentences.'+positionNote+'</p>',
     '<div class="math-sec"><div class="math-h">Priority: '+score+' of 1.000</div>'+
       '<div class="math-track"><span class="math-seg" style="width:'+scorePct+'%;background:#8b5e34"></span></div>'+
       '<div class="math-scale"><span>0.000</span><span>'+score+'</span><span>1.000</span></div></div>',
-    '<div class="math-sec"><div class="math-h">Gate vs rank contribution</div>'+
+    '<div class="math-sec"><div class="math-h">Why highlighted vs why ranked here</div>'+
       rankedSignals.map(s=>signalRowHtml(s)).join('')+
-      '<span class="meaning">Gate status uses raw values. Rank contribution uses capped points. A signal can add ranking points even when it did not qualify the sentence.</span></div>',
+      '<span class="meaning">The left side asks: could this signal highlight the sentence by itself? The right side asks: how much did it raise priority?</span></div>',
     '<div class="math-sec"><div class="math-h">How the priority score adds up</div>'+
       '<div class="math-track">'+rankedSignals.map(s=>
         '<span class="math-seg" style="width:'+(s.contribution*100)+'%;background:'+s.color+'"></span>').join('')+'</div>'+
@@ -775,29 +775,48 @@ function auditExplanation(score, comp, d, A){
   rows.push('<div class="math-sec"><div class="math-h">Visible evidence: '+items+' card'+(items===1?'':'s')+'</div>'+
     (groups.length?'<div class="evidence-grid">'+groups.map(x=>
       '<div class="evidence-stat"><b>'+x[0]+'</b>'+x[1]+(x[0]===1?'':'s')+'</div>').join('')+'</div>':'')+
-    '<span class="meaning">This is just the number of evidence cards shown here. It is not the weighted sentence-links gate above.</span></div>');
+    '<span class="meaning">This is just the number of cards shown here. It is not the same as weighted sentence links.</span></div>');
   rows.push('<div class="method-note">Method: '+esc(comp.profile||'unknown')+
     ' · the same indexed text always receives the same score.</div>');
   return rows.join('');
 }
 
+function mathPageUrl(score, comp, d, A, quote){
+  const params=new URLSearchParams();
+  params.set('text', quote||'');
+  params.set('score', score);
+  params.set('keyness', comp.keyness==null?'0':String(comp.keyness));
+  params.set('concentration', comp.burstiness==null?'0':String(comp.burstiness));
+  params.set('links', comp.centrality==null?'0':String(comp.centrality));
+  params.set('position', comp.structural_boost?'1':'0');
+  params.set('top', comp.top_keyword||'');
+  params.set('evidence', String(d.edge_count||0));
+  params.set('recurrence', String((A.recurrence||[]).length));
+  params.set('rhetorical', String((A.rhetorical||[]).length));
+  params.set('related', String((A.propositional||[]).length));
+  params.set('outside', String((A.allusion||[]).length));
+  params.set('structural', String((A.structural||[]).length));
+  return 'math-by-hand.html?'+params.toString();
+}
+
 function signalRowHtml(s){
   const status=s.hasGate
-    ? (s.passed?'passed':'did not pass')
-    : 'no gate';
+    ? (s.passed?'yes':'no')
+    : 'not a highlight test';
   const pill=s.hasGate
     ? (s.passed?'gate-pass':'gate-fail')
     : 'gate-none';
   const gateText=s.hasGate
-    ? s.rawDisplay+' / '+(s.floor<1?s.floor.toFixed(2):s.floor)
+    ? s.rawDisplay+' of '+(s.floor<1?s.floor.toFixed(2):s.floor)+' needed'
     : s.rawDisplay;
   const pct=s.max ? Math.max(0,Math.min(100,(s.contribution/s.max)*100)) : 0;
   return '<div class="signal-row">'+
     '<div><div class="signal-name"><span class="math-swatch" style="background:'+s.color+'"></span> '+s.name+'</div>'+
       '<div class="signal-note">'+esc(s.note)+'</div></div>'+
-    '<div><span class="gate-pill '+pill+'">'+status+'</span><div class="gate-value">'+gateText+'</div></div>'+
+    '<div><div class="signal-note">Enough by itself?</div><span class="gate-pill '+pill+'">'+status+'</span><div class="gate-value">'+gateText+'</div></div>'+
     '<div><div class="contrib-track"><div class="contrib-fill" style="width:'+pct+'%;background:'+s.color+'"></div></div>'+
-      '<div class="contrib-value">'+s.contribution.toFixed(3)+' / '+s.max.toFixed(3)+' rank points</div></div>'+
+      '<div class="contrib-value">'+s.contribution.toFixed(3)+' / '+s.max.toFixed(3)+
+      ' priority boost · max starts at '+esc(s.rankCap)+'</div></div>'+
     '</div>';
 }
 
